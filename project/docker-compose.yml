@@ -42,10 +42,10 @@ services:
       - ./postgres-data:/var/lib/postgresql/data
       - ./database-init:/docker-entrypoint-initdb.d/
 
-  authentication-service:
+  authentication_service:
     build:
-      context: ../authentication-service
-      dockerfile: ./authentication-service.dockerfile
+      context: ../authentication_service
+      dockerfile: ./authentication_service.dockerfile
     restart: always
     deploy:
       mode: replicated
