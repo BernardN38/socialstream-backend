@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/BernardN38/flutter-backend/sql/users"
 	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
@@ -175,5 +176,78 @@ func TestInvalidCreatUserInput(t *testing.T) {
 		}
 	}
 
+	TearDown(t, db)
+}
+
+// happy path
+func TestLoginUser(t *testing.T) {
+	ctx := context.Background()
+	db := SetupDatabase(t)
+	authService := New(db)
+
+	username := "testLoginUsername"
+	password := "testLoginPassword"
+	email := "testLoginEmail"
+	_, err := authService.authDbQuries.CreateUser(ctx, users.CreateUserParams{
+		Username: username,
+		Password: password,
+		Email:    email,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	userId, err := authService.LoginUser(ctx, LoginUserInput{
+		Username: username,
+		Password: password,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	if userId == 0 {
+		t.Error("invalid userId returned")
+	}
+	TearDown(t, db)
+}
+
+// test invalid username or password
+func TestInvalidLoginUser(t *testing.T) {
+	ctx := context.Background()
+	db := SetupDatabase(t)
+	authService := New(db)
+
+	username := "testLoginUsername"
+	password := "testLoginPassword"
+	email := "testLoginEmail"
+	_, err := authService.authDbQuries.CreateUser(ctx, users.CreateUserParams{
+		Username: username,
+		Password: password,
+		Email:    email,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	userId, err := authService.LoginUser(ctx, LoginUserInput{
+		Username: username,
+		Password: "wrongpassword",
+	})
+	if err == nil {
+		t.Error(err)
+	}
+	if userId != 0 {
+		t.Error("invalid userId returned")
+	}
+
+	userId, err = authService.LoginUser(ctx, LoginUserInput{
+		Username: "invalidUsername",
+		Password: password,
+	})
+	if err == nil {
+		t.Error(err)
+	}
+	if userId != 0 {
+		t.Error("invalid userId returned")
+	}
 	TearDown(t, db)
 }

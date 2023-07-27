@@ -8,10 +8,9 @@ type CreateUserInput struct {
 	Password string `json:"password" validate:"required"`
 }
 
-type UpdateUserInput struct {
-	FirstName string `json:"firstName" validate:"required"`
-	LastName  string `json:"lastName" validate:"required"`
-	Password  string `json:"password" validate:"required"`
+type LoginUserInput struct {
+	Username string `json:"username" validate:"required"`
+	Password string `json:"password" validate:"required"`
 }
 
 func Validate(input *interface{}) error {
