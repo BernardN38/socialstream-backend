@@ -3,7 +3,6 @@ module github.com/BernardN38/flutter-backend
 go 1.20
 
 require (
-	github.com/go-chi/chi v1.5.4
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-playground/validator/v10 v10.14.1
 	github.com/stretchr/testify v1.8.4

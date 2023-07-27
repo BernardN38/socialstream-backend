@@ -8,8 +8,8 @@ SELECT *
 FROM users
 WHERE username = $1 LIMIT 1;
 
--- name: GetUserPassword :one
-SELECT password
+-- name: GetUserPasswordAndId :one
+SELECT id, password
 FROM users
 WHERE username = $1 LIMIT 1;
 
