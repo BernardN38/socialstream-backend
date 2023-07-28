@@ -79,17 +79,22 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
-const getUserPassword = `-- name: GetUserPassword :one
-SELECT password
+const getUserPasswordAndId = `-- name: GetUserPasswordAndId :one
+SELECT id,password
 FROM users
 WHERE username = $1 LIMIT 1
 `
 
-func (q *Queries) GetUserPassword(ctx context.Context, username string) (string, error) {
-	row := q.db.QueryRowContext(ctx, getUserPassword, username)
-	var password string
-	err := row.Scan(&password)
-	return password, err
+type GetUserPasswordAndIdRow struct {
+	ID       int32
+	Password string
+}
+
+func (q *Queries) GetUserPasswordAndId(ctx context.Context, username string) (GetUserPasswordAndIdRow, error) {
+	row := q.db.QueryRowContext(ctx, getUserPasswordAndId, username)
+	var i GetUserPasswordAndIdRow
+	err := row.Scan(&i.ID, &i.Password)
+	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many

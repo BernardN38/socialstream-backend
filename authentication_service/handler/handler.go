@@ -44,3 +44,26 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusCreated)
 }
+
+func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
+	var loginUserInput LoginUserInput
+	err := json.NewDecoder(r.Body).Decode(&loginUserInput)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = Validate(loginUserInput)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	userId, err := h.AuthService.LoginUser(r.Context(), service.LoginUserInput(loginUserInput))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	json.NewEncoder(w).Encode(map[string]any{
+		"userId": userId,
+	})
+	w.WriteHeader(http.StatusCreated)
+}

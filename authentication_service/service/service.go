@@ -48,3 +48,14 @@ func (a *AuthSerice) CreateUser(ctx context.Context, CreateUserInput CreateUserI
 	log.Printf("user created, %+v", user)
 	return nil
 }
+
+func (a *AuthSerice) LoginUser(ctx context.Context, loginUserInput LoginUserInput) (int32, error) {
+	row, err := a.authDbQuries.GetUserPasswordAndId(ctx, loginUserInput.Username)
+	if err != nil {
+		return 0, err
+	}
+	if row.Password != loginUserInput.Password {
+		return 0, errors.New("unathorized")
+	}
+	return row.ID, nil
+}
