@@ -9,6 +9,7 @@ import (
 	"github.com/BernardN38/flutter-backend/handler"
 	"github.com/BernardN38/flutter-backend/service"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
 	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 )
@@ -46,8 +47,10 @@ func New() *Application {
 	//init service layer
 	authService := service.New(db)
 
+	tokenManager := jwtauth.New("HS256", []byte(config.JwtSecret), nil)
+
 	//init handler, inject service
-	handler := handler.NewHandler(authService)
+	handler := handler.NewHandler(authService, tokenManager)
 
 	//init server, inject handler & confid
 	server := NewServer(handler, config)

@@ -9,6 +9,7 @@ import (
 type config struct {
 	Port        string `validate:"required"`
 	PostgresDsn string `validate:"required"`
+	JwtSecret   string `validate:"required"`
 }
 
 func (c *config) Validate() error {
@@ -23,9 +24,11 @@ func (c *config) Validate() error {
 func getEnvConfig() (*config, error) {
 	port := os.Getenv("port")
 	postgresDsn := os.Getenv("postgresDsn")
+	jwtSecret := os.Getenv("jwtSecret")
 	config := config{
 		Port:        port,
 		PostgresDsn: postgresDsn,
+		JwtSecret:   jwtSecret,
 	}
 	err := config.Validate()
 	if err != nil {

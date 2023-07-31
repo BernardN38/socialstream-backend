@@ -2,19 +2,25 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
+	"time"
 
 	"github.com/BernardN38/flutter-backend/service"
+	"github.com/go-chi/jwtauth/v5"
 	_ "github.com/lib/pq"
 )
 
 type Handler struct {
-	AuthService *service.AuthSerice
+	AuthService  *service.AuthSerice
+	TokenManager *jwtauth.JWTAuth
 }
 
-func NewHandler(authService *service.AuthSerice) *Handler {
+func NewHandler(authService *service.AuthSerice, tokenManager *jwtauth.JWTAuth) *Handler {
 	return &Handler{
-		AuthService: authService,
+		AuthService:  authService,
+		TokenManager: tokenManager,
 	}
 }
 func (h *Handler) CheckHealth(w http.ResponseWriter, r *http.Request) {
@@ -62,8 +68,38 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	expirationTime := time.Now().Add(time.Minute * 30)
+	_, tokenString, err := h.TokenManager.Encode(map[string]interface{}{"user_id": userId, "iss": "test", "exp": expirationTime})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Create an HttpOnly cookie to store the JWT token on the client-side
+	cookie := &http.Cookie{
+		Name:     "jwt",
+		Value:    tokenString,
+		Expires:  expirationTime, // Cookie expiration time (30 minutes)
+		HttpOnly: true,           // HttpOnly flag for added security
+		Secure:   false,
+		Path:     "/",
+	}
+
+	http.SetCookie(w, cookie)
+
+	// Respond with a success message
+	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{
 		"userId": userId,
 	})
-	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *Handler) AdminCheck(w http.ResponseWriter, r *http.Request) {
+	token, _, err := jwtauth.FromContext(r.Context())
+	if err != nil {
+		http.Error(w, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+		return
+	}
+	log.Printf("%+v", token)
+	fmt.Fprintln(w, "Protected route - Access granted!")
 }
