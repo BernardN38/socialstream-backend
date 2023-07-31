@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/BernardN38/flutter-backend/service"
+	"github.com/BernardN38/flutter-backend/authentication_service/service"
 	"github.com/go-chi/jwtauth/v5"
 	_ "github.com/lib/pq"
 )

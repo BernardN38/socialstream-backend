@@ -1,4 +1,5 @@
-module github.com/BernardN38/flutter-backend
+module github.com/BernardN38/flutter-backend/authentication_service
+
 
 go 1.20
 

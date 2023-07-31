@@ -6,7 +6,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/BernardN38/flutter-backend/sql/users"
+	"github.com/BernardN38/flutter-backend/authentication_service/sql/users"
 	"github.com/lib/pq"
 )
 
