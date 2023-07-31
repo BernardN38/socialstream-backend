@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BernardN38/flutter-backend/sql/users"
+	"github.com/BernardN38/flutter-backend/authentication_service/sql/users"
 	_ "github.com/lib/pq"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
