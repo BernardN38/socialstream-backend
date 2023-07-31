@@ -80,7 +80,7 @@ func (db *TestDatabase) Close(t *testing.T) {
 
 func Setup(t *testing.T) (*httptest.Server, service.AuthSerice, *sql.DB) {
 	db := SetupDatabase(t)
-	authService := service.New(db)
+	authService := service.New(db, nil)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 	h := NewHandler(authService, tokenAuth)
 	server := httptest.NewServer(http.HandlerFunc(h.LoginUser))

@@ -1,6 +1,5 @@
 module github.com/BernardN38/flutter-backend/authentication_service
 
-
 go 1.20
 
 require (
@@ -59,6 +58,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pressly/goose/v3 v3.14.0
 	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/streadway/amqp v1.1.0
 	golang.org/x/crypto v0.10.0 // indirect
 	golang.org/x/exp v0.0.0-20230510235704-dd950f8aeaea // indirect
 	golang.org/x/net v0.11.0 // indirect

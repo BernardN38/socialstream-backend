@@ -8,11 +8,11 @@ import (
 )
 
 type Handler struct {
-	UserService  *service.UserSerice
+	UserService  *service.UserService
 	TokenManager *jwtauth.JWTAuth
 }
 
-func NewHandler(userService *service.UserSerice, tokenManager *jwtauth.JWTAuth) *Handler {
+func NewHandler(userService *service.UserService, tokenManager *jwtauth.JWTAuth) *Handler {
 	return &Handler{
 		UserService:  userService,
 		TokenManager: tokenManager,
