@@ -17,10 +17,10 @@ type Handler struct {
 	TokenManager *jwtauth.JWTAuth
 }
 
-func NewHandler(authService *service.AuthSerice, tokenAuth *jwtauth.JWTAuth) *Handler {
+func NewHandler(authService *service.AuthSerice, tokenManager *jwtauth.JWTAuth) *Handler {
 	return &Handler{
 		AuthService:  authService,
-		TokenManager: tokenAuth,
+		TokenManager: tokenManager,
 	}
 }
 func (h *Handler) CheckHealth(w http.ResponseWriter, r *http.Request) {
