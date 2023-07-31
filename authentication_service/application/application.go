@@ -47,9 +47,10 @@ func New() *Application {
 	//init service layer
 	authService := service.New(db)
 
-	tokenAuth := jwtauth.New("HS256", []byte(config.JwtSecret), nil)
+	tokenManager := jwtauth.New("HS256", []byte(config.JwtSecret), nil)
+
 	//init handler, inject service
-	handler := handler.NewHandler(authService, tokenAuth)
+	handler := handler.NewHandler(authService, tokenManager)
 
 	//init server, inject handler & confid
 	server := NewServer(handler, config)
