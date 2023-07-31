@@ -1,20 +1,34 @@
 package service
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/BernardN38/flutter-backend/user_service/sql/users"
 )
 
-type UserSerice struct {
+type UserService struct {
 	userDb       *sql.DB
 	userDbQuries *users.Queries
 }
 
-func New(userDb *sql.DB) *UserSerice {
+func New(userDb *sql.DB) *UserService {
 	userDbQueries := users.New(userDb)
-	return &UserSerice{
+	return &UserService{
 		userDb:       userDb,
 		userDbQuries: userDbQueries,
 	}
+}
+
+func (u *UserService) CreateUser(ctx context.Context, createUserInput CreateUserInput) error {
+	_, err := u.userDbQuries.CreateUser(ctx, users.CreateUserParams{
+		Username:  createUserInput.Username,
+		Email:     createUserInput.Email,
+		Firstname: createUserInput.FirstName,
+		Lastname:  createUserInput.LastName,
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
