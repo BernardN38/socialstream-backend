@@ -70,6 +70,26 @@ services:
       timeout: 5s
       retries: 5
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: 'rabbitmq'
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+            limits:
+              cpus: "1"
+              memory: 1024M
+            reservations:
+              cpus: "0.25"
+              memory: 128M
+    ports:
+        - 5672:5672
+        - 15672:15672
+    volumes:
+        - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+        - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+
   authentication-service:
     build:
       context: ../authentication_service
@@ -89,6 +109,7 @@ services:
       postgresDsn: "user=postgres password=password host=postgres dbname=authentication_service port=5432 sslmode=disable"
       jwtSecret: "qwertyuiopasdfghjklzxcvbnm123456"
       port: ":8080"
+      rabbitmqUrl: "amqp://guest:guest@rabbitmq"
     depends_on:
       - postgres
 
@@ -111,5 +132,6 @@ services:
       postgresDsn: "user=postgres password=password host=postgres dbname=user_service port=5432 sslmode=disable"
       jwtSecret: "qwertyuiopasdfghjklzxcvbnm123456"
       port: ":8080"
+      rabbitmqUrl: "amqp://guest:guest@rabbitmq"
     depends_on:
       - postgres
