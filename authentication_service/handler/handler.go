@@ -26,7 +26,18 @@ func NewHandler(authService *service.AuthSerice, tokenManager *jwtauth.JWTAuth) 
 func (h *Handler) CheckHealth(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("authentication service up and running"))
 }
-
+func (h *Handler) DEBUG_GetAllUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.AuthService.GetAllUsers(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = json.NewEncoder(w).Encode(users)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
 func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var createUserInput CreateUserInput
 	err := json.NewDecoder(r.Body).Decode(&createUserInput)
@@ -45,7 +56,7 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 		Password:  createUserInput.Password,
 		FirstName: createUserInput.FirstName,
 		LastName:  createUserInput.LastName,
-	})
+	}, "user")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return

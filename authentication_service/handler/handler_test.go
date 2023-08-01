@@ -23,13 +23,21 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 )
 
-type TestDatabase struct {
-	instance testcontainers.Container
-}
-
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
 
+type TestDatabase struct {
+	instance testcontainers.Container
+}
+type MockRabbitmqProducer struct {
+}
+
+func (m *MockRabbitmqProducer) Publish(string, []byte) error {
+	return nil
+}
+func (m *MockRabbitmqProducer) Close() error {
+	return nil
+}
 func NewTestDatabase(t *testing.T) *TestDatabase {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	os.Setenv("TESTCONTAINERS_RYUK_DISABLED", "true")
@@ -80,7 +88,8 @@ func (db *TestDatabase) Close(t *testing.T) {
 
 func Setup(t *testing.T) (*httptest.Server, service.AuthSerice, *sql.DB) {
 	db := SetupDatabase(t)
-	authService := service.New(db, nil)
+	mockRabbitmqProducer := &MockRabbitmqProducer{}
+	authService := service.New(db, mockRabbitmqProducer)
 	tokenAuth := jwtauth.New("HS256", []byte("secret"), nil)
 	h := NewHandler(authService, tokenAuth)
 	server := httptest.NewServer(http.HandlerFunc(h.LoginUser))
@@ -123,7 +132,7 @@ func TestLoginUser(t *testing.T) {
 		Username: username,
 		Password: password,
 		Email:    email,
-	})
+	}, "user")
 	if err != nil {
 		t.Errorf("failed to create user: %v", err)
 	}

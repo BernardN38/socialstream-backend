@@ -32,3 +32,11 @@ func (u *UserService) CreateUser(ctx context.Context, createUserInput CreateUser
 	}
 	return nil
 }
+
+func (u *UserService) GetAllUsers(ctx context.Context) ([]users.User, error) {
+	users, err := u.userDbQuries.ListUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}

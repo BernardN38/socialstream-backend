@@ -4,6 +4,11 @@ import (
 	"github.com/streadway/amqp"
 )
 
+type RabbitMQProducerInterface interface {
+	Publish(string, []byte) error
+	Close() error
+}
+
 // RabbitMQProducer represents a RabbitMQ message producer.
 type RabbitMQProducer struct {
 	conn     *amqp.Connection
@@ -17,7 +22,6 @@ func NewRabbitMQProducer(conn *amqp.Connection, exchangeName string) (*RabbitMQP
 		conn.Close()
 		return nil, err
 	}
-
 	err = channel.ExchangeDeclare(
 		exchangeName,
 		"fanout",

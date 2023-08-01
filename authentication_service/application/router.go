@@ -18,8 +18,12 @@ func SetupRouter(h *handler.Handler) *chi.Mux {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Get("/api/v1/auth/health", h.CheckHealth)
-	r.Post("/api/v1/auth/user", h.CreateUser)
-	r.Post("/api/v1/auth/user/login", h.LoginUser)
+
+	// for debug purposes
+	r.Get("/api/v1/auth/users", h.DEBUG_GetAllUsers)
+
+	r.Post("/api/v1/auth/users", h.CreateUser)
+	r.Post("/api/v1/auth/users/login", h.LoginUser)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {

@@ -10,24 +10,31 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users(username, password, email)
-VALUES ($1, $2, $3) RETURNING id, username, email, password
+INSERT INTO users(username, password, email, role)
+VALUES ($1, $2, $3, $4) RETURNING id, username, email, password, role
 `
 
 type CreateUserParams struct {
 	Username string
 	Password string
 	Email    string
+	Role     string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.Username, arg.Password, arg.Email)
+	row := q.db.QueryRowContext(ctx, createUser,
+		arg.Username,
+		arg.Password,
+		arg.Email,
+		arg.Role,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
 		&i.Email,
 		&i.Password,
+		&i.Role,
 	)
 	return i, err
 }
@@ -43,8 +50,48 @@ func (q *Queries) DeleteUser(ctx context.Context, id int32) error {
 	return err
 }
 
+const getAllUsers = `-- name: GetAllUsers :many
+SELECT id, username, email, role
+FROM users
+`
+
+type GetAllUsersRow struct {
+	ID       int32
+	Username string
+	Email    string
+	Role     string
+}
+
+func (q *Queries) GetAllUsers(ctx context.Context) ([]GetAllUsersRow, error) {
+	rows, err := q.db.QueryContext(ctx, getAllUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetAllUsersRow
+	for rows.Next() {
+		var i GetAllUsersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Username,
+			&i.Email,
+			&i.Role,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getUserById = `-- name: GetUserById :one
-SELECT id, username, email, password
+SELECT id, username, email, password, role
 FROM users
 WHERE id = $1 LIMIT 1
 `
@@ -57,12 +104,13 @@ func (q *Queries) GetUserById(ctx context.Context, id int32) (User, error) {
 		&i.Username,
 		&i.Email,
 		&i.Password,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, password
+SELECT id, username, email, password, role
 FROM users
 WHERE username = $1 LIMIT 1
 `
@@ -75,12 +123,13 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Username,
 		&i.Email,
 		&i.Password,
+		&i.Role,
 	)
 	return i, err
 }
 
 const getUserPasswordAndId = `-- name: GetUserPasswordAndId :one
-SELECT id,password
+SELECT id, password
 FROM users
 WHERE username = $1 LIMIT 1
 `
@@ -97,8 +146,21 @@ func (q *Queries) GetUserPasswordAndId(ctx context.Context, username string) (Ge
 	return i, err
 }
 
+const getUserRoleByUserId = `-- name: GetUserRoleByUserId :one
+SELECT role
+FROM users
+WHERE id = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserRoleByUserId(ctx context.Context, id int32) (string, error) {
+	row := q.db.QueryRowContext(ctx, getUserRoleByUserId, id)
+	var role string
+	err := row.Scan(&role)
+	return role, err
+}
+
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, email, password
+SELECT id, username, email, password, role
 FROM users
 ORDER BY id
 `
@@ -117,6 +179,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.Username,
 			&i.Email,
 			&i.Password,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}
