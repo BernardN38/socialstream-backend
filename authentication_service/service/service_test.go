@@ -209,14 +209,14 @@ func TestLoginUser(t *testing.T) {
 		t.Error(err)
 	}
 
-	userId, err := authService.LoginUser(ctx, LoginUserInput{
+	user, err := authService.LoginUser(ctx, LoginUserInput{
 		Username: username,
 		Password: password,
 	})
 	if err != nil {
 		t.Error(err)
 	}
-	if userId == 0 {
+	if user.ID == 0 {
 		t.Error("invalid userId returned")
 	}
 	TearDown(t, db)
@@ -241,26 +241,58 @@ func TestInvalidLoginUser(t *testing.T) {
 		t.Error(err)
 	}
 
-	userId, err := authService.LoginUser(ctx, LoginUserInput{
+	user, err := authService.LoginUser(ctx, LoginUserInput{
 		Username: username,
 		Password: "wrongpassword",
 	})
 	if err == nil {
 		t.Error(err)
 	}
-	if userId != 0 {
+	if user.ID != 0 {
 		t.Error("invalid userId returned")
 	}
 
-	userId, err = authService.LoginUser(ctx, LoginUserInput{
+	user, err = authService.LoginUser(ctx, LoginUserInput{
 		Username: "invalidUsername",
 		Password: password,
 	})
 	if err == nil {
 		t.Error(err)
 	}
-	if userId != 0 {
+	if user.ID != 0 {
 		t.Error("invalid userId returned")
 	}
+	TearDown(t, db)
+}
+
+func TestLoginUserPasswordHidden(t *testing.T) {
+	ctx := context.Background()
+	db := SetupDatabase(t)
+	mockRabbitmqProducer := &MockRabbitmqProducer{}
+	authService := New(db, mockRabbitmqProducer)
+
+	username := "testLoginUsername"
+	password := "testLoginPassword"
+	email := "testLoginEmail"
+	_, err := authService.authDbQuries.CreateUser(ctx, users.CreateUserParams{
+		Username: username,
+		Password: password,
+		Email:    email,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+
+	user, err := authService.LoginUser(ctx, LoginUserInput{
+		Username: username,
+		Password: "wrongpassword",
+	})
+	if err == nil {
+		t.Error(err)
+	}
+	if user.Password != "" {
+		t.Error("password not hidden when returning user from service.loginuser() ")
+	}
+
 	TearDown(t, db)
 }

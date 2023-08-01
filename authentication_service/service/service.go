@@ -69,13 +69,14 @@ func (a *AuthSerice) CreateUser(ctx context.Context, createUserInput CreateUserI
 	return nil
 }
 
-func (a *AuthSerice) LoginUser(ctx context.Context, loginUserInput LoginUserInput) (int32, error) {
-	row, err := a.authDbQuries.GetUserPasswordAndId(ctx, loginUserInput.Username)
+func (a *AuthSerice) LoginUser(ctx context.Context, loginUserInput LoginUserInput) (users.User, error) {
+	user, err := a.authDbQuries.GetUserByUsername(ctx, loginUserInput.Username)
 	if err != nil {
-		return 0, err
+		return users.User{}, err
 	}
-	if row.Password != loginUserInput.Password {
-		return 0, errors.New("unathorized")
+	if user.Password != loginUserInput.Password {
+		return users.User{}, errors.New("unathorized")
 	}
-	return row.ID, nil
+	user.Password = ""
+	return user, nil
 }

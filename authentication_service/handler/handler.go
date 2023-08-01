@@ -76,14 +76,14 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	userId, err := h.AuthService.LoginUser(r.Context(), service.LoginUserInput(loginUserInput))
+	user, err := h.AuthService.LoginUser(r.Context(), service.LoginUserInput(loginUserInput))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	expirationTime := time.Now().Add(time.Minute * 30)
-	_, tokenString, err := h.TokenManager.Encode(map[string]interface{}{"user_id": userId, "iss": "test", "exp": expirationTime})
+	_, tokenString, err := h.TokenManager.Encode(map[string]interface{}{"user_id": user.ID, "iss": "test", "exp": expirationTime, "role": user.Role, "username": user.Username})
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -103,7 +103,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	// Respond with a success message
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]any{
-		"userId": userId,
+		"userId": user.ID,
 	})
 }
 
