@@ -89,6 +89,11 @@ services:
     volumes:
         - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
         - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+    healthcheck:
+      test: rabbitmq-diagnostics -q ping
+      interval: 30s
+      timeout: 30s
+      retries: 3
 
   authentication-service:
     build:
@@ -112,6 +117,7 @@ services:
       rabbitmqUrl: "amqp://guest:guest@rabbitmq"
     depends_on:
       - postgres
+      - rabbitmq
 
   user-service:
     build:
@@ -135,3 +141,4 @@ services:
       rabbitmqUrl: "amqp://guest:guest@rabbitmq"
     depends_on:
       - postgres
+      - rabbitmq
