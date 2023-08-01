@@ -8,10 +8,6 @@ SELECT *
 FROM users
 WHERE username = $1 LIMIT 1;
 
--- name: GetUserPasswordAndId :one
-SELECT id, password
-FROM users
-WHERE username = $1 LIMIT 1;
 
 -- name: ListUsers :many
 SELECT *
@@ -19,8 +15,8 @@ FROM users
 ORDER BY id;
 
 -- name: CreateUser :one
-INSERT INTO users(username, password, email)
-VALUES ($1, $2, $3) RETURNING *;
+INSERT INTO users(username,email, firstname,lastname)
+VALUES ($1, $2, $3, $4) RETURNING *;
 
 -- name: DeleteUser :exec
 DELETE

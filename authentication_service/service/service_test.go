@@ -103,7 +103,7 @@ func TestCreateuser(t *testing.T) {
 	ctx := context.Background()
 
 	db := SetupDatabase(t)
-	authService := New(db)
+	authService := New(db, nil)
 
 	user1 := CreateUserInput{
 		Username: "testUsername",
@@ -122,7 +122,7 @@ func TestDuplicateUser(t *testing.T) {
 	ctx := context.Background()
 
 	db := SetupDatabase(t)
-	authService := New(db)
+	authService := New(db, nil)
 
 	user1 := CreateUserInput{
 		Username: "testUsername",
@@ -167,7 +167,7 @@ func TestInvalidCreatUserInput(t *testing.T) {
 	}
 	ctx := context.Background()
 	db := SetupDatabase(t)
-	authService := New(db)
+	authService := New(db, nil)
 
 	for _, v := range testCases {
 		err := authService.CreateUser(ctx, v)
@@ -183,7 +183,7 @@ func TestInvalidCreatUserInput(t *testing.T) {
 func TestLoginUser(t *testing.T) {
 	ctx := context.Background()
 	db := SetupDatabase(t)
-	authService := New(db)
+	authService := New(db, nil)
 
 	username := "testLoginUsername"
 	password := "testLoginPassword"
@@ -214,7 +214,7 @@ func TestLoginUser(t *testing.T) {
 func TestInvalidLoginUser(t *testing.T) {
 	ctx := context.Background()
 	db := SetupDatabase(t)
-	authService := New(db)
+	authService := New(db, nil)
 
 	username := "testLoginUsername"
 	password := "testLoginPassword"

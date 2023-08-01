@@ -3,31 +3,35 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log"
 
+	"github.com/BernardN38/flutter-backend/authentication_service/rabbitmq"
 	"github.com/BernardN38/flutter-backend/authentication_service/sql/users"
 	"github.com/lib/pq"
 )
 
 type AuthSerice struct {
-	authDb       *sql.DB
-	authDbQuries *users.Queries
+	authDb           *sql.DB
+	authDbQuries     *users.Queries
+	rabbitmqProducer *rabbitmq.RabbitMQProducer
 }
 
-func New(authDb *sql.DB) *AuthSerice {
+func New(authDb *sql.DB, rabbitmqProducer *rabbitmq.RabbitMQProducer) *AuthSerice {
 	authDbQueries := users.New(authDb)
 	return &AuthSerice{
-		authDb:       authDb,
-		authDbQuries: authDbQueries,
+		authDb:           authDb,
+		authDbQuries:     authDbQueries,
+		rabbitmqProducer: rabbitmqProducer,
 	}
 }
 
-func (a *AuthSerice) CreateUser(ctx context.Context, CreateUserInput CreateUserInput) error {
+func (a *AuthSerice) CreateUser(ctx context.Context, createUserInput CreateUserInput) error {
 	user, err := a.authDbQuries.CreateUser(ctx, users.CreateUserParams{
-		Username: CreateUserInput.Username,
-		Password: CreateUserInput.Password,
-		Email:    CreateUserInput.Email,
+		Username: createUserInput.Username,
+		Password: createUserInput.Password,
+		Email:    createUserInput.Email,
 	})
 	if err != nil {
 		switch e := err.(type) {
@@ -45,6 +49,11 @@ func (a *AuthSerice) CreateUser(ctx context.Context, CreateUserInput CreateUserI
 			return errors.New("database error")
 		}
 	}
+	message, err := json.Marshal(UserCreatedMessage{Username: user.Username, Email: user.Email, FirstName: createUserInput.FirstName, LastName: createUserInput.LastName})
+	if err != nil {
+		return err
+	}
+	a.rabbitmqProducer.Publish("user.created", message)
 	log.Printf("user created, %+v", user)
 	return nil
 }

@@ -10,24 +10,31 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users(username, password, email)
-VALUES ($1, $2, $3) RETURNING id, username, email, password
+INSERT INTO users(username,email, firstname,lastname)
+VALUES ($1, $2, $3, $4) RETURNING id, username, email, firstname, lastname
 `
 
 type CreateUserParams struct {
-	Username string
-	Password string
-	Email    string
+	Username  string
+	Email     string
+	Firstname string
+	Lastname  string
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRowContext(ctx, createUser, arg.Username, arg.Password, arg.Email)
+	row := q.db.QueryRowContext(ctx, createUser,
+		arg.Username,
+		arg.Email,
+		arg.Firstname,
+		arg.Lastname,
+	)
 	var i User
 	err := row.Scan(
 		&i.ID,
 		&i.Username,
 		&i.Email,
-		&i.Password,
+		&i.Firstname,
+		&i.Lastname,
 	)
 	return i, err
 }
@@ -44,7 +51,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id int32) error {
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, username, email, password
+SELECT id, username, email, firstname, lastname
 FROM users
 WHERE id = $1 LIMIT 1
 `
@@ -56,13 +63,14 @@ func (q *Queries) GetUserById(ctx context.Context, id int32) (User, error) {
 		&i.ID,
 		&i.Username,
 		&i.Email,
-		&i.Password,
+		&i.Firstname,
+		&i.Lastname,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, password
+SELECT id, username, email, firstname, lastname
 FROM users
 WHERE username = $1 LIMIT 1
 `
@@ -74,31 +82,14 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.ID,
 		&i.Username,
 		&i.Email,
-		&i.Password,
+		&i.Firstname,
+		&i.Lastname,
 	)
 	return i, err
 }
 
-const getUserPasswordAndId = `-- name: GetUserPasswordAndId :one
-SELECT id, password
-FROM users
-WHERE username = $1 LIMIT 1
-`
-
-type GetUserPasswordAndIdRow struct {
-	ID       int32
-	Password string
-}
-
-func (q *Queries) GetUserPasswordAndId(ctx context.Context, username string) (GetUserPasswordAndIdRow, error) {
-	row := q.db.QueryRowContext(ctx, getUserPasswordAndId, username)
-	var i GetUserPasswordAndIdRow
-	err := row.Scan(&i.ID, &i.Password)
-	return i, err
-}
-
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, email, password
+SELECT id, username, email, firstname, lastname
 FROM users
 ORDER BY id
 `
@@ -116,7 +107,8 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.ID,
 			&i.Username,
 			&i.Email,
-			&i.Password,
+			&i.Firstname,
+			&i.Lastname,
 		); err != nil {
 			return nil, err
 		}
