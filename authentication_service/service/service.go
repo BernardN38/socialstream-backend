@@ -15,10 +15,10 @@ import (
 type AuthSerice struct {
 	authDb           *sql.DB
 	authDbQuries     *users.Queries
-	rabbitmqProducer *rabbitmq.RabbitMQProducer
+	rabbitmqProducer rabbitmq.RabbitMQProducerInterface
 }
 
-func New(authDb *sql.DB, rabbitmqProducer *rabbitmq.RabbitMQProducer) *AuthSerice {
+func New(authDb *sql.DB, rabbitmqProducer rabbitmq.RabbitMQProducerInterface) *AuthSerice {
 	authDbQueries := users.New(authDb)
 	return &AuthSerice{
 		authDb:           authDb,
@@ -26,12 +26,23 @@ func New(authDb *sql.DB, rabbitmqProducer *rabbitmq.RabbitMQProducer) *AuthSeric
 		rabbitmqProducer: rabbitmqProducer,
 	}
 }
+func (a *AuthSerice) GetAllUsers(ctx context.Context) ([]users.GetAllUsersRow, error) {
+	users, err := a.authDbQuries.GetAllUsers(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return users, nil
+}
 
-func (a *AuthSerice) CreateUser(ctx context.Context, createUserInput CreateUserInput) error {
+func (a *AuthSerice) CreateUser(ctx context.Context, createUserInput CreateUserInput, role string) error {
+	if role == "" {
+		role = "user"
+	}
 	user, err := a.authDbQuries.CreateUser(ctx, users.CreateUserParams{
 		Username: createUserInput.Username,
 		Password: createUserInput.Password,
 		Email:    createUserInput.Email,
+		Role:     role,
 	})
 	if err != nil {
 		switch e := err.(type) {

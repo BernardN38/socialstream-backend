@@ -21,6 +21,16 @@ type TestDatabase struct {
 	instance testcontainers.Container
 }
 
+type MockRabbitmqProducer struct {
+}
+
+func (m *MockRabbitmqProducer) Publish(string, []byte) error {
+	return nil
+}
+func (m *MockRabbitmqProducer) Close() error {
+	return nil
+}
+
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
 
@@ -43,7 +53,6 @@ func NewTestDatabase(t *testing.T) *TestDatabase {
 	}
 
 	postgres, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
-
 		ContainerRequest: req,
 		Started:          true,
 		Reuse:            true,
@@ -92,7 +101,7 @@ func SetupDatabase(t *testing.T) *sql.DB {
 	return db
 }
 func TearDown(t *testing.T, db *sql.DB) {
-	// time.Sleep(time.Second * 10)
+	// time.Sleep(time.Second * 5)
 	if err := goose.Reset(db, "migrations"); err != nil {
 		t.Error(err)
 	}
@@ -103,14 +112,15 @@ func TestCreateuser(t *testing.T) {
 	ctx := context.Background()
 
 	db := SetupDatabase(t)
-	authService := New(db, nil)
+	mockRabbitmqProducer := &MockRabbitmqProducer{}
+	authService := New(db, mockRabbitmqProducer)
 
 	user1 := CreateUserInput{
 		Username: "testUsername",
 		Email:    "testEmail",
 		Password: "testPassword",
 	}
-	err := authService.CreateUser(ctx, user1)
+	err := authService.CreateUser(ctx, user1, "user")
 	if err != nil {
 		t.Error(err)
 	}
@@ -122,18 +132,19 @@ func TestDuplicateUser(t *testing.T) {
 	ctx := context.Background()
 
 	db := SetupDatabase(t)
-	authService := New(db, nil)
+	mockRabbitmqProducer := &MockRabbitmqProducer{}
+	authService := New(db, mockRabbitmqProducer)
 
 	user1 := CreateUserInput{
 		Username: "testUsername",
 		Email:    "testEmail@gmail.com",
 		Password: "testPassword",
 	}
-	err := authService.CreateUser(ctx, user1)
+	err := authService.CreateUser(ctx, user1, "user")
 	if err != nil {
 		t.Error(err)
 	}
-	err = authService.CreateUser(ctx, user1)
+	err = authService.CreateUser(ctx, user1, "user")
 	if err == nil {
 		t.Error("duplicate username or email allowed without error")
 	}
@@ -167,10 +178,11 @@ func TestInvalidCreatUserInput(t *testing.T) {
 	}
 	ctx := context.Background()
 	db := SetupDatabase(t)
-	authService := New(db, nil)
+	mockRabbitmqProducer := &MockRabbitmqProducer{}
+	authService := New(db, mockRabbitmqProducer)
 
 	for _, v := range testCases {
-		err := authService.CreateUser(ctx, v)
+		err := authService.CreateUser(ctx, v, "user")
 		if err == nil {
 			t.Error(err)
 		}
@@ -183,8 +195,8 @@ func TestInvalidCreatUserInput(t *testing.T) {
 func TestLoginUser(t *testing.T) {
 	ctx := context.Background()
 	db := SetupDatabase(t)
-	authService := New(db, nil)
-
+	mockRabbitmqProducer := &MockRabbitmqProducer{}
+	authService := New(db, mockRabbitmqProducer)
 	username := "testLoginUsername"
 	password := "testLoginPassword"
 	email := "testLoginEmail"
@@ -214,7 +226,8 @@ func TestLoginUser(t *testing.T) {
 func TestInvalidLoginUser(t *testing.T) {
 	ctx := context.Background()
 	db := SetupDatabase(t)
-	authService := New(db, nil)
+	mockRabbitmqProducer := &MockRabbitmqProducer{}
+	authService := New(db, mockRabbitmqProducer)
 
 	username := "testLoginUsername"
 	password := "testLoginPassword"

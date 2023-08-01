@@ -118,6 +118,11 @@ services:
     depends_on:
       - postgres
       - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/auth/health"]
+      interval: 30s  # Time between health checks
+      timeout: 10s   # Timeout for a single health check
+      retries: 3  
 
   user-service:
     build:
@@ -142,3 +147,8 @@ services:
     depends_on:
       - postgres
       - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/auth/health"]
+      interval: 30s  
+      timeout: 10s  
+      retries: 3  
