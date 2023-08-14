@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -56,4 +57,33 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func (h *Handler) UploadUserProfileImage(w http.ResponseWriter, r *http.Request) {
+	userId := chi.URLParam(r, "userId")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// Parse the incoming form data
+	err = r.ParseMultipartForm(10 << 20) // 20MB limit
+	if err != nil {
+		http.Error(w, "Unable to parse form", http.StatusBadRequest)
+		return
+	}
+
+	// Get the file from the "image" field in the form
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		http.Error(w, "Unable to get file from request", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	err = h.UserService.UpdateUserProfileImage(r.Context(), int32(userIdInt), file, header)
+	if err != nil {
+		log.Println(err)
+		http.Error(w, "Unable to proccess upload", http.StatusBadRequest)
+		return
+	}
 }
