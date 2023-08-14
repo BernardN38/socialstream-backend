@@ -15,10 +15,10 @@ VALUES ($1, $2, $3, $4) RETURNING id, username, email, password, role
 `
 
 type CreateUserParams struct {
-	Username string
-	Password string
-	Email    string
-	Role     string
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
@@ -56,10 +56,10 @@ FROM users
 `
 
 type GetAllUsersRow struct {
-	ID       int32
-	Username string
-	Email    string
-	Role     string
+	ID       int32  `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Role     string `json:"role"`
 }
 
 func (q *Queries) GetAllUsers(ctx context.Context) ([]GetAllUsersRow, error) {
@@ -135,8 +135,8 @@ WHERE username = $1 LIMIT 1
 `
 
 type GetUserPasswordAndIdRow struct {
-	ID       int32
-	Password string
+	ID       int32  `json:"id"`
+	Password string `json:"password"`
 }
 
 func (q *Queries) GetUserPasswordAndId(ctx context.Context, username string) (GetUserPasswordAndIdRow, error) {

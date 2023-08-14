@@ -22,8 +22,8 @@ func SetupRouter(h *handler.Handler) *chi.Mux {
 	// for debug purposes
 	r.Get("/api/v1/auth/users", h.DEBUG_GetAllUsers)
 
-	r.Post("/api/v1/auth/users", h.CreateUser)
-	r.Post("/api/v1/auth/users/login", h.LoginUser)
+	r.Post("/api/v1/auth/register", h.CreateUser)
+	r.Post("/api/v1/auth/login", h.LoginUser)
 
 	// Protected routes
 	r.Group(func(r chi.Router) {

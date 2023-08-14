@@ -7,9 +7,9 @@ package users
 import ()
 
 type User struct {
-	ID       int32
-	Username string
-	Email    string
-	Password string
-	Role     string
+	ID       int32  `json:"id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Role     string `json:"role"`
 }
