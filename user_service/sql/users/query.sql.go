@@ -15,10 +15,10 @@ VALUES ($1, $2, $3, $4) RETURNING id, username, email, firstname, lastname
 `
 
 type CreateUserParams struct {
-	Username  string
-	Email     string
-	Firstname string
-	Lastname  string
+	Username  string `json:"username"`
+	Email     string `json:"email"`
+	Firstname string `json:"firstname"`
+	Lastname  string `json:"lastname"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {

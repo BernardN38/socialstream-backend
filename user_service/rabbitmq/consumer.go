@@ -81,7 +81,7 @@ func (c *RabbitMQConsumer) Consume() error {
 	msgs, err := c.channel.Consume(
 		c.queue,
 		"",
-		false,
+		true,
 		false,
 		false,
 		false,

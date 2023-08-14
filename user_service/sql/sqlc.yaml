@@ -1,7 +1,11 @@
-version: 1
-packages:
-  - path: "users"
-    name: "users"
-    engine: "postgresql"
-    schema: "schema.sql"
-    queries: "query.sql"
+version: "2"
+sql:
+  - schema: schema.sql
+    queries: query.sql
+    engine: postgresql
+    gen:
+      go:
+        package: users
+        out: users
+        json_tags_case_style: "camel"
+        emit_json_tags: true

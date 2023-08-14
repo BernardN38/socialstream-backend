@@ -40,3 +40,11 @@ func (u *UserService) GetAllUsers(ctx context.Context) ([]users.User, error) {
 	}
 	return users, nil
 }
+
+func (u *UserService) GetUser(ctx context.Context, userId int32) (users.User, error) {
+	user, err := u.userDbQuries.GetUserById(ctx, userId)
+	if err != nil {
+		return users.User{}, err
+	}
+	return user, nil
+}

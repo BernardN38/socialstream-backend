@@ -19,6 +19,7 @@ func SetupRouter(h *handler.Handler) *chi.Mux {
 
 	r.Get("/api/v1/users/health", h.CheckHealth)
 	r.Get("/api/v1/users/all", h.GetAllUsers)
+	r.Get("/api/v1/users/{userId}", h.GetUser)
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(jwtauth.Verifier(h.TokenManager))
