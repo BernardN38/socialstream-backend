@@ -7,10 +7,13 @@ import (
 )
 
 type config struct {
-	Port        string `validate:"required"`
-	PostgresDsn string `validate:"required"`
-	JwtSecret   string `validate:"required"`
-	RabbitUrl   string `validate:"required"`
+	Port                 string `validate:"required"`
+	PostgresDsn          string `validate:"required"`
+	JwtSecret            string `validate:"required"`
+	RabbitUrl            string `validate:"required"`
+	MinioEndpoint        string `validate:"required"`
+	MinioAccessKeyID     string `validate:"required"`
+	MinioSecretAccessKey string `validate:"required"`
 }
 
 func (c *config) Validate() error {
@@ -27,11 +30,17 @@ func getEnvConfig() (*config, error) {
 	postgresDsn := os.Getenv("postgresDsn")
 	jwtSecret := os.Getenv("jwtSecret")
 	rabbitUrl := os.Getenv("rabbitmqUrl")
+	minioAccessKeyID := os.Getenv("minioAccessKeyID")
+	minioSecretAccessKey := os.Getenv("minioSecretAccessKey")
+	minioEndpoint := os.Getenv("minioEndpoint")
 	config := config{
-		Port:        port,
-		PostgresDsn: postgresDsn,
-		JwtSecret:   jwtSecret,
-		RabbitUrl:   rabbitUrl,
+		Port:                 port,
+		PostgresDsn:          postgresDsn,
+		JwtSecret:            jwtSecret,
+		RabbitUrl:            rabbitUrl,
+		MinioAccessKeyID:     minioAccessKeyID,
+		MinioSecretAccessKey: minioSecretAccessKey,
+		MinioEndpoint:        minioEndpoint,
 	}
 	err := config.Validate()
 	if err != nil {

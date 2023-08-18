@@ -18,6 +18,8 @@ ORDER BY id;
 INSERT INTO users(username,email, firstname,lastname)
 VALUES ($1, $2, $3, $4) RETURNING *;
 
+-- name: UpdateUserProfileImage :exec
+UPDATE users SET profile_image_id = $2 WHERE id = $1;
 -- name: DeleteUser :exec
 DELETE
 FROM users

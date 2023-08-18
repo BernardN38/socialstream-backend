@@ -24,6 +24,7 @@ func SetupRouter(h *handler.Handler) *chi.Mux {
 	r.Group(func(r chi.Router) {
 		r.Use(jwtauth.Verifier(h.TokenManager))
 		r.Use(jwtauth.Authenticator)
+		r.Post("/api/v1/users/{userId}/profileImage", h.UploadUserProfileImage)
 	})
 	return r
 }

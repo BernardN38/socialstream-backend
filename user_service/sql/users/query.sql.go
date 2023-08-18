@@ -7,11 +7,13 @@ package users
 
 import (
 	"context"
+
+	"github.com/google/uuid"
 )
 
 const createUser = `-- name: CreateUser :one
 INSERT INTO users(username,email, firstname,lastname)
-VALUES ($1, $2, $3, $4) RETURNING id, username, email, firstname, lastname
+VALUES ($1, $2, $3, $4) RETURNING id, username, email, firstname, lastname, profile_image_id
 `
 
 type CreateUserParams struct {
@@ -35,6 +37,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.Email,
 		&i.Firstname,
 		&i.Lastname,
+		&i.ProfileImageID,
 	)
 	return i, err
 }
@@ -51,7 +54,7 @@ func (q *Queries) DeleteUser(ctx context.Context, id int32) error {
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, username, email, firstname, lastname
+SELECT id, username, email, firstname, lastname, profile_image_id
 FROM users
 WHERE id = $1 LIMIT 1
 `
@@ -65,12 +68,13 @@ func (q *Queries) GetUserById(ctx context.Context, id int32) (User, error) {
 		&i.Email,
 		&i.Firstname,
 		&i.Lastname,
+		&i.ProfileImageID,
 	)
 	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, firstname, lastname
+SELECT id, username, email, firstname, lastname, profile_image_id
 FROM users
 WHERE username = $1 LIMIT 1
 `
@@ -84,12 +88,13 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.Email,
 		&i.Firstname,
 		&i.Lastname,
+		&i.ProfileImageID,
 	)
 	return i, err
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, username, email, firstname, lastname
+SELECT id, username, email, firstname, lastname, profile_image_id
 FROM users
 ORDER BY id
 `
@@ -109,6 +114,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.Email,
 			&i.Firstname,
 			&i.Lastname,
+			&i.ProfileImageID,
 		); err != nil {
 			return nil, err
 		}
@@ -121,4 +127,18 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateUserProfileImage = `-- name: UpdateUserProfileImage :exec
+UPDATE users SET profile_image_id = $2 WHERE id = $1
+`
+
+type UpdateUserProfileImageParams struct {
+	ID             int32         `json:"id"`
+	ProfileImageID uuid.NullUUID `json:"profileImageId"`
+}
+
+func (q *Queries) UpdateUserProfileImage(ctx context.Context, arg UpdateUserProfileImageParams) error {
+	_, err := q.db.ExecContext(ctx, updateUserProfileImage, arg.ID, arg.ProfileImageID)
+	return err
 }

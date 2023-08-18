@@ -11,9 +11,12 @@ import (
 	"github.com/BernardN38/flutter-backend/user_service/handler"
 	"github.com/BernardN38/flutter-backend/user_service/rabbitmq"
 	"github.com/BernardN38/flutter-backend/user_service/service"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	_ "github.com/lib/pq"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/pressly/goose/v3"
 	"github.com/streadway/amqp"
 )
@@ -53,9 +56,10 @@ func New() *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
+	minioClient := ConnectToMinio(config)
 
 	//init service layer
-	userService := service.New(db)
+	userService := service.New(db, minioClient, service.UserServiceConfig{MinioBucketName: "user-service"})
 
 	// init rabbitmq Consumer and inject userService to handle messages
 	rabbitConsumer, err := rabbitmq.NewRabbitMQConsumer(rabbitmqConn, "user-service", userService)
@@ -130,4 +134,18 @@ func ConnectRabbitMQWithRetry(amqpURL string, maxRetries int, retryInterval time
 	}
 
 	return nil, fmt.Errorf("failed to connect to RabbitMQ after %d retries", maxRetries)
+}
+
+func ConnectToMinio(config *config) *minio.Client {
+	log.Println(config.MinioEndpoint, config.MinioAccessKeyID, config.MinioSecretAccessKey)
+	useSSL := false
+	// Initialize minio client object.
+	minioClient, err := minio.New("minio:9000", &minio.Options{
+		Creds:  credentials.NewStaticV4(config.MinioAccessKeyID, config.MinioSecretAccessKey, ""),
+		Secure: useSSL,
+	})
+	if err != nil {
+		log.Fatalln(err)
+	}
+	return minioClient
 }

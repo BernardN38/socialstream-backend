@@ -4,12 +4,15 @@
 
 package users
 
-import ()
+import (
+	"github.com/google/uuid"
+)
 
 type User struct {
-	ID        int32  `json:"id"`
-	Username  string `json:"username"`
-	Email     string `json:"email"`
-	Firstname string `json:"firstname"`
-	Lastname  string `json:"lastname"`
+	ID             int32         `json:"id"`
+	Username       string        `json:"username"`
+	Email          string        `json:"email"`
+	Firstname      string        `json:"firstname"`
+	Lastname       string        `json:"lastname"`
+	ProfileImageID uuid.NullUUID `json:"profileImageId"`
 }
