@@ -14,6 +14,7 @@ type config struct {
 	MinioEndpoint        string `validate:"required"`
 	MinioAccessKeyID     string `validate:"required"`
 	MinioSecretAccessKey string `validate:"required"`
+	MinioBucketName      string `validate:"required"`
 }
 
 func (c *config) Validate() error {
@@ -33,6 +34,7 @@ func getEnvConfig() (*config, error) {
 	minioAccessKeyID := os.Getenv("minioAccessKeyID")
 	minioSecretAccessKey := os.Getenv("minioSecretAccessKey")
 	minioEndpoint := os.Getenv("minioEndpoint")
+	minioBucketName := os.Getenv("minioBucketName")
 	config := config{
 		Port:                 port,
 		PostgresDsn:          postgresDsn,
@@ -41,6 +43,7 @@ func getEnvConfig() (*config, error) {
 		MinioAccessKeyID:     minioAccessKeyID,
 		MinioSecretAccessKey: minioSecretAccessKey,
 		MinioEndpoint:        minioEndpoint,
+		MinioBucketName:      minioBucketName,
 	}
 	err := config.Validate()
 	if err != nil {
