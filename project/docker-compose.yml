@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   nginx:
@@ -7,12 +7,12 @@ services:
       mode: replicated
       replicas: 1
       resources:
-            limits:
-              cpus: "1"
-              memory: 1024M
-            reservations:
-              cpus: "0.25"
-              memory: 128M
+        limits:
+          cpus: "1"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     restart: always
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf
@@ -23,29 +23,29 @@ services:
     depends_on:
       - authentication-service
 
-  # minio:
-  #   image: minio/minio
-  #   command: server --address ":9000" --console-address ":9001" /data
-  #   ports:
-  #     - "9001:9001"
-  #   environment:
-  #     MINIO_ACCESS_KEY: minio
-  #     MINIO_SECRET_KEY: minio123
-  #   volumes:
-  #     - ${PWD}/minio-data:/data
-     
+  minio:
+    image: minio/minio
+    command: server --address ":9000" --console-address ":9001" /data
+    ports:
+      - "9001:9001"
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    volumes:
+      - ${PWD}/minio-data:/data
+
   postgres:
     image: postgres:14-alpine
     deploy:
       mode: replicated
       replicas: 1
       resources:
-            limits:
-              cpus: "1"
-              memory: 1024M
-            reservations:
-              cpus: "0.25"
-              memory: 128M
+        limits:
+          cpus: "1"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     restart: always
     environment:
       - POSTGRES_USER=bernardn
@@ -60,7 +60,7 @@ services:
         max-size: 10m
         max-file: "3"
     ports:
-      - '5438:5432'
+      - "5438:5432"
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
       - ./database-init:/docker-entrypoint-initdb.d/
@@ -72,23 +72,23 @@ services:
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
-    container_name: 'rabbitmq'
+    container_name: "rabbitmq"
     deploy:
       mode: replicated
       replicas: 1
       resources:
-            limits:
-              cpus: "1"
-              memory: 1024M
-            reservations:
-              cpus: "0.25"
-              memory: 128M
+        limits:
+          cpus: "1"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     ports:
-        - 5672:5672
-        - 15672:15672
+      - 5672:5672
+      - 15672:15672
     volumes:
-        - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
-        - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
+      - ~/.docker-conf/rabbitmq/data/:/var/lib/rabbitmq/
+      - ~/.docker-conf/rabbitmq/log/:/var/log/rabbitmq
     healthcheck:
       test: rabbitmq-diagnostics -q ping
       interval: 30s
@@ -104,12 +104,12 @@ services:
       mode: replicated
       replicas: 1
       resources:
-            limits:
-              cpus: "1"
-              memory: 1024M
-            reservations:
-              cpus: "0.25"
-              memory: 128M
+        limits:
+          cpus: "1"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     environment:
       postgresDsn: "user=postgres password=password host=postgres dbname=authentication_service port=5432 sslmode=disable"
       jwtSecret: "qwertyuiopasdfghjklzxcvbnm123456"
@@ -120,9 +120,9 @@ services:
       - rabbitmq
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/auth/health"]
-      interval: 30s  # Time between health checks
-      timeout: 10s   # Timeout for a single health check
-      retries: 3  
+      interval: 30s # Time between health checks
+      timeout: 10s # Timeout for a single health check
+      retries: 3
 
   user-service:
     build:
@@ -133,22 +133,59 @@ services:
       mode: replicated
       replicas: 1
       resources:
-            limits:
-              cpus: "1"
-              memory: 1024M
-            reservations:
-              cpus: "0.25"
-              memory: 128M
+        limits:
+          cpus: "1"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     environment:
       postgresDsn: "user=postgres password=password host=postgres dbname=user_service port=5432 sslmode=disable"
       jwtSecret: "qwertyuiopasdfghjklzxcvbnm123456"
+      minioEndpoint: "minio:9000"
+      minioAccessKeyID: RwPNkWfpHNYn7XGpwPEX
+      minioSecretAccessKey: wLkmCQb3gMAMvwiprRYcbJlECZ6inr7SCb6IE1ia
+      port: ":8080"
+      rabbitmqUrl: "amqp://guest:guest@rabbitmq"
+      minioBucketName: "user-service"
+    depends_on:
+      - postgres
+      - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/users/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  media-service:
+    build:
+      context: ../media_service
+      dockerfile: ./media_service.dockerfile
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          cpus: "1"
+          memory: 1024M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    environment:
+      postgresDsn: "user=postgres password=password host=postgres dbname=media_service port=5432 sslmode=disable"
+      jwtSecret: "qwertyuiopasdfghjklzxcvbnm123456"
+      minioEndpoint: "minio:9000"
+      minioAccessKeyID: RwPNkWfpHNYn7XGpwPEX
+      minioSecretAccessKey: wLkmCQb3gMAMvwiprRYcbJlECZ6inr7SCb6IE1ia
+      minioBucketName: "media-service"
       port: ":8080"
       rabbitmqUrl: "amqp://guest:guest@rabbitmq"
     depends_on:
       - postgres
       - rabbitmq
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/auth/health"]
-      interval: 30s  
-      timeout: 10s  
-      retries: 3  
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/media/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
