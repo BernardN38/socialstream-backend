@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/jwtauth/v5"
 )
 
-func SetupRouter(h *handler.Handler) *chi.Mux {
+func SetupRouter(h *handler.Handler, tm *jwtauth.JWTAuth) *chi.Mux {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.RequestID)
@@ -22,7 +22,7 @@ func SetupRouter(h *handler.Handler) *chi.Mux {
 	r.Get("/api/v1/users/{userId}", h.GetUser)
 	// Protected routes
 	r.Group(func(r chi.Router) {
-		r.Use(jwtauth.Verifier(h.TokenManager))
+		r.Use(jwtauth.Verifier(tm))
 		r.Use(jwtauth.Authenticator)
 		r.Post("/api/v1/users/{userId}/profileImage", h.UploadUserProfileImage)
 	})

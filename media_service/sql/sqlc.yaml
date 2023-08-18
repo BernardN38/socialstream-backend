@@ -1,0 +1,11 @@
+version: "2"
+sql:
+  - schema: schema.sql
+    queries: query.sql
+    engine: postgresql
+    gen:
+      go:
+        package: media_sql
+        out: media
+        json_tags_case_style: "camel"
+        emit_json_tags: true

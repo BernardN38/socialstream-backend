@@ -8,18 +8,15 @@ import (
 
 	"github.com/BernardN38/flutter-backend/user_service/service"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/jwtauth/v5"
 )
 
 type Handler struct {
-	UserService  *service.UserService
-	TokenManager *jwtauth.JWTAuth
+	UserService *service.UserService
 }
 
-func NewHandler(userService *service.UserService, tokenManager *jwtauth.JWTAuth) *Handler {
+func NewHandler(userService *service.UserService) *Handler {
 	return &Handler{
-		UserService:  userService,
-		TokenManager: tokenManager,
+		UserService: userService,
 	}
 }
 func (h *Handler) CheckHealth(w http.ResponseWriter, r *http.Request) {

@@ -1,14 +1,17 @@
 {
-	"folders": [
-		{
-			"path": "project"
-		},
-		{
-			"path": "authentication_service"
-		},
-		{
-			"path": "user_service"
-		}
-	],
-	"settings": {}
+  "folders": [
+    {
+      "path": "project"
+    },
+    {
+      "path": "authentication_service"
+    },
+    {
+      "path": "user_service"
+    },
+    {
+      "path": "media_service"
+    }
+  ],
+  "settings": {}
 }

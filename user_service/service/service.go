@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"log"
+	"io"
 	"mime/multipart"
 	"time"
 
+	rpc_client "github.com/BernardN38/flutter-backend/user_service/rpc/client"
 	"github.com/BernardN38/flutter-backend/user_service/sql/users"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -17,36 +18,26 @@ type UserService struct {
 	userDb       *sql.DB
 	userDbQuries *users.Queries
 	minioClient  *minio.Client
+	rpcClient    *rpc_client.RpcClient
 	config       *UserServiceConfig
 }
 type UserServiceConfig struct {
 	MinioBucketName string
 }
 
-func New(userDb *sql.DB, minioClient *minio.Client, config UserServiceConfig) *UserService {
+func New(userDb *sql.DB, minioClient *minio.Client, rpcClient *rpc_client.RpcClient, config UserServiceConfig) (*UserService, error) {
 	userDbQueries := users.New(userDb)
-	bucketName := config.MinioBucketName
-	exists, err := minioClient.BucketExists(context.Background(), bucketName)
+	err := setup(*minioClient, "user-service")
 	if err != nil {
-		log.Fatalln(err)
-	}
-
-	if !exists {
-		// Create the bucket
-		err = minioClient.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{})
-		if err != nil {
-			log.Fatalln(err)
-		}
-		log.Printf("Bucket '%s' created successfully\n", bucketName)
-	} else {
-		log.Printf("Bucket '%s' already exists\n", bucketName)
+		return nil, err
 	}
 	return &UserService{
 		userDb:       userDb,
 		userDbQuries: userDbQueries,
 		minioClient:  minioClient,
+		rpcClient:    rpcClient,
 		config:       &config,
-	}
+	}, nil
 }
 
 func (u *UserService) CreateUser(ctx context.Context, createUserInput CreateUserInput) error {
@@ -113,8 +104,7 @@ func (u *UserService) GetUser(ctx context.Context, userId int32) (users.User, er
 	}
 }
 func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, image multipart.File, imageHeader *multipart.FileHeader) error {
-	// Create a new context with a timeout of 200 ms
-	ctx, cancel := context.WithTimeout(ctx, 100*time.Millisecond)
+	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 	defer cancel()
 
 	newImageId := uuid.New()
@@ -136,27 +126,31 @@ func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, 
 		return err
 	}
 
-	infoCh := make(chan minio.UploadInfo)
+	successCh := make(chan bool)
 	errCh := make(chan error)
 
 	go func() {
-		info, err := u.minioClient.PutObject(ctx, u.config.MinioBucketName, newImageId.String(), image, imageHeader.Size, minio.PutObjectOptions{
+		imageBytes, err := io.ReadAll(image)
+		if err != nil {
+			errCh <- err
+		}
+		err = u.rpcClient.UploadImage(&rpc_client.ImageUpload{
+			ImageData:   imageBytes,
+			MediaId:     newImageId,
 			ContentType: imageHeader.Header.Get("Content-Type"),
 		})
 		if err != nil {
 			errCh <- err
-			return
 		}
-		infoCh <- info
+		successCh <- true
 	}()
 
 	select {
-	case info := <-infoCh:
+	case <-successCh:
 		err = tx.Commit()
 		if err != nil {
 			return err
 		}
-		log.Println(info)
 		return nil
 	case err := <-errCh:
 		tx.Rollback()
