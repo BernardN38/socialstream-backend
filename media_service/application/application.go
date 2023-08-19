@@ -12,6 +12,7 @@ import (
 
 	"github.com/BernardN38/flutter-backend/media_service/handler"
 	"github.com/BernardN38/flutter-backend/media_service/rabbitmq"
+	rpc_client "github.com/BernardN38/flutter-backend/media_service/rpc/client"
 	rpc_server "github.com/BernardN38/flutter-backend/media_service/rpc/server"
 	"github.com/BernardN38/flutter-backend/media_service/service"
 
@@ -41,7 +42,10 @@ func New() *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	l, err := net.Listen("tcp", ":8081")
+	if err != nil {
+		log.Fatal(err)
+	}
 	//connect to postgres db
 	db, err := sql.Open("postgres", config.PostgresDsn)
 	if err != nil {
@@ -61,11 +65,32 @@ func New() *Application {
 	}
 	minioClient := ConnectToMinio(config)
 
-	//init service layer
-	mediaService, err := service.New(minioClient, db, service.MediaServiceConfig{MinioBucketName: config.MinioBucketName})
+	userServiceRpcClient, err := ConnectToRpcServer("user-service:8081", 5, 10*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
+	rpcClient, err := rpc_client.New(userServiceRpcClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//init service layer
+	mediaService, err := service.New(minioClient, db, rpcClient, service.MediaServiceConfig{MinioBucketName: config.MinioBucketName})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		rpc_server.New(mediaService)
+		// start the rpc server
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			go rpc.ServeConn(conn)
+		}
+	}()
 	// init rabbitmq Consumer and inject userService to handle messages
 	rabbitConsumer, err := rabbitmq.NewRabbitMQConsumer(rabbitmqConn, "media-service", mediaService)
 	if err != nil {
@@ -88,17 +113,6 @@ func New() *Application {
 	//init server, inject handler & confid
 	server := NewServer(handler, tokenManager, config)
 
-	go func() {
-		rpc_server.New(mediaService)
-		// start the rpc server
-		l, err := net.Listen("tcp", ":8081")
-		if err != nil {
-			log.Println(err)
-		}
-		for {
-			go rpc.Accept(l)
-		}
-	}()
 	return &Application{
 		server: server,
 	}
@@ -163,4 +177,21 @@ func ConnectToMinio(config *config) *minio.Client {
 		log.Fatalln(err)
 	}
 	return minioClient
+}
+
+func ConnectToRpcServer(address string, retries int, retryInterval time.Duration) (*rpc.Client, error) {
+	var userServiceRpcClient *rpc.Client
+	var err error
+
+	for i := 0; i < retries; i++ {
+		userServiceRpcClient, err = rpc.Dial("tcp", address)
+		if err == nil {
+			return userServiceRpcClient, nil
+		}
+
+		log.Printf("Error connecting to user service. Retrying in %s...\n", retryInterval)
+		time.Sleep(retryInterval)
+	}
+
+	return nil, err
 }

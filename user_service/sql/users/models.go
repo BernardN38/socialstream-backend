@@ -9,7 +9,7 @@ import (
 )
 
 type User struct {
-	ID             int32         `json:"id"`
+	UserID         int32         `json:"userId"`
 	Username       string        `json:"username"`
 	Email          string        `json:"email"`
 	Firstname      string        `json:"firstname"`

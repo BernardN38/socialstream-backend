@@ -1,6 +1,7 @@
 package rpc_client
 
 import (
+	"log"
 	"net/rpc"
 
 	"github.com/google/uuid"
@@ -22,9 +23,22 @@ func New(mediaServiceClient *rpc.Client) (*RpcClient, error) {
 	}, nil
 }
 
-func (rc *RpcClient) UploadImage(ImageUpload *ImageUpload) error {
+func (rc *RpcClient) UploadMedia(ImageUpload *ImageUpload) error {
 	var replyErr error
 	err := rc.mediaServiceRpcClient.Call("RpcServer.UploadImage", ImageUpload, &replyErr)
+	if err != nil {
+		return err
+	}
+	if replyErr != nil {
+		return replyErr
+	}
+	return nil
+}
+
+func (rc *RpcClient) DeleteMedia(mediaId uuid.UUID) error {
+	log.Println("sending rpc call to media service to delete media id: ", mediaId)
+	var replyErr error
+	err := rc.mediaServiceRpcClient.Call("RpcServer.DeleteImage", mediaId, &replyErr)
 	if err != nil {
 		return err
 	}

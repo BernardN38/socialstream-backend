@@ -18,6 +18,7 @@ func SetupRouter(h *handler.Handler, tm *jwtauth.JWTAuth) *chi.Mux {
 	r.Use(middleware.Timeout(60 * time.Second))
 
 	r.Get("/api/v1/media/health", h.CheckHealth)
+	r.Get("/api/v1/media/users/{userId}", h.GetUserProfileImage)
 	// Protected routes
 	r.Group(func(r chi.Router) {
 		r.Use(jwtauth.Verifier(tm))

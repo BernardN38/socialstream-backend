@@ -2,6 +2,7 @@ package rpc_server
 
 import (
 	"context"
+	"log"
 	"net/rpc"
 
 	"github.com/BernardN38/flutter-backend/media_service/service"
@@ -39,5 +40,11 @@ func (s *RpcServer) UploadImage(payload ImageUpload, reply *error) error {
 		ContentType: payload.ContentType,
 	})
 	reply = &resp
+	return nil
+}
+func (s *RpcServer) DeleteImage(payload uuid.UUID, reply *error) error {
+	log.Println("rpc server recieved delete call for media id:", payload)
+	err := s.mediaService.DeleteMedia(context.Background(), payload)
+	reply = &err
 	return nil
 }

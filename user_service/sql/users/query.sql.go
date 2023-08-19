@@ -12,11 +12,12 @@ import (
 )
 
 const createUser = `-- name: CreateUser :one
-INSERT INTO users(username,email, firstname,lastname)
-VALUES ($1, $2, $3, $4) RETURNING id, username, email, firstname, lastname, profile_image_id
+INSERT INTO users(user_id, username,email, firstname,lastname)
+VALUES ($1, $2, $3, $4, $5) RETURNING user_id, username, email, firstname, lastname, profile_image_id
 `
 
 type CreateUserParams struct {
+	UserID    int32  `json:"userId"`
 	Username  string `json:"username"`
 	Email     string `json:"email"`
 	Firstname string `json:"firstname"`
@@ -25,6 +26,7 @@ type CreateUserParams struct {
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
 	row := q.db.QueryRowContext(ctx, createUser,
+		arg.UserID,
 		arg.Username,
 		arg.Email,
 		arg.Firstname,
@@ -32,7 +34,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	)
 	var i User
 	err := row.Scan(
-		&i.ID,
+		&i.UserID,
 		&i.Username,
 		&i.Email,
 		&i.Firstname,
@@ -45,25 +47,25 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 const deleteUser = `-- name: DeleteUser :exec
 DELETE
 FROM users
-WHERE id = $1
+WHERE user_id = $1
 `
 
-func (q *Queries) DeleteUser(ctx context.Context, id int32) error {
-	_, err := q.db.ExecContext(ctx, deleteUser, id)
+func (q *Queries) DeleteUser(ctx context.Context, userID int32) error {
+	_, err := q.db.ExecContext(ctx, deleteUser, userID)
 	return err
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, username, email, firstname, lastname, profile_image_id
+SELECT user_id, username, email, firstname, lastname, profile_image_id
 FROM users
-WHERE id = $1 LIMIT 1
+WHERE user_id = $1 LIMIT 1
 `
 
-func (q *Queries) GetUserById(ctx context.Context, id int32) (User, error) {
-	row := q.db.QueryRowContext(ctx, getUserById, id)
+func (q *Queries) GetUserById(ctx context.Context, userID int32) (User, error) {
+	row := q.db.QueryRowContext(ctx, getUserById, userID)
 	var i User
 	err := row.Scan(
-		&i.ID,
+		&i.UserID,
 		&i.Username,
 		&i.Email,
 		&i.Firstname,
@@ -74,7 +76,7 @@ func (q *Queries) GetUserById(ctx context.Context, id int32) (User, error) {
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
-SELECT id, username, email, firstname, lastname, profile_image_id
+SELECT user_id, username, email, firstname, lastname, profile_image_id
 FROM users
 WHERE username = $1 LIMIT 1
 `
@@ -83,7 +85,7 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	row := q.db.QueryRowContext(ctx, getUserByUsername, username)
 	var i User
 	err := row.Scan(
-		&i.ID,
+		&i.UserID,
 		&i.Username,
 		&i.Email,
 		&i.Firstname,
@@ -93,10 +95,23 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 	return i, err
 }
 
-const listUsers = `-- name: ListUsers :many
-SELECT id, username, email, firstname, lastname, profile_image_id
+const getUserProfileImageByUserId = `-- name: GetUserProfileImageByUserId :one
+SELECT profile_image_id
 FROM users
-ORDER BY id
+WHERE user_id = $1 LIMIT 1
+`
+
+func (q *Queries) GetUserProfileImageByUserId(ctx context.Context, userID int32) (uuid.NullUUID, error) {
+	row := q.db.QueryRowContext(ctx, getUserProfileImageByUserId, userID)
+	var profile_image_id uuid.NullUUID
+	err := row.Scan(&profile_image_id)
+	return profile_image_id, err
+}
+
+const listUsers = `-- name: ListUsers :many
+SELECT user_id, username, email, firstname, lastname, profile_image_id
+FROM users
+ORDER BY user_id
 `
 
 func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
@@ -109,7 +124,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 	for rows.Next() {
 		var i User
 		if err := rows.Scan(
-			&i.ID,
+			&i.UserID,
 			&i.Username,
 			&i.Email,
 			&i.Firstname,
@@ -130,15 +145,15 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 }
 
 const updateUserProfileImage = `-- name: UpdateUserProfileImage :exec
-UPDATE users SET profile_image_id = $2 WHERE id = $1
+UPDATE users SET profile_image_id = $2 WHERE user_id = $1
 `
 
 type UpdateUserProfileImageParams struct {
-	ID             int32         `json:"id"`
+	UserID         int32         `json:"userId"`
 	ProfileImageID uuid.NullUUID `json:"profileImageId"`
 }
 
 func (q *Queries) UpdateUserProfileImage(ctx context.Context, arg UpdateUserProfileImageParams) error {
-	_, err := q.db.ExecContext(ctx, updateUserProfileImage, arg.ID, arg.ProfileImageID)
+	_, err := q.db.ExecContext(ctx, updateUserProfileImage, arg.UserID, arg.ProfileImageID)
 	return err
 }
