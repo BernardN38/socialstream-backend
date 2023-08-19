@@ -8,6 +8,7 @@ import (
 
 	"github.com/BernardN38/flutter-backend/user_service/service"
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
 )
 
 type Handler struct {
@@ -55,12 +56,18 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-
 func (h *Handler) UploadUserProfileImage(w http.ResponseWriter, r *http.Request) {
 	userId := chi.URLParam(r, "userId")
 	userIdInt, err := strconv.Atoi(userId)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	ctxUserId := claims["user_id"].(float64)
+
+	if int(ctxUserId) != userIdInt {
+		http.Error(w, "unathorized", http.StatusUnauthorized)
 		return
 	}
 	// Parse the incoming form data
@@ -77,7 +84,7 @@ func (h *Handler) UploadUserProfileImage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	defer file.Close()
-	err = h.UserService.UpdateUserProfileImage(r.Context(), int32(userIdInt), file, header)
+	err = h.UserService.UpdateUserProfileImage(r.Context(), int32(ctxUserId), file, header)
 	if err != nil {
 		log.Println(err)
 		http.Error(w, "Unable to proccess upload", http.StatusBadRequest)

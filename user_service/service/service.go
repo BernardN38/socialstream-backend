@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"io"
+	"log"
 	"mime/multipart"
 	"time"
 
@@ -42,6 +43,7 @@ func New(userDb *sql.DB, minioClient *minio.Client, rpcClient *rpc_client.RpcCli
 
 func (u *UserService) CreateUser(ctx context.Context, createUserInput CreateUserInput) error {
 	_, err := u.userDbQuries.CreateUser(ctx, users.CreateUserParams{
+		UserID:    createUserInput.UserId,
 		Username:  createUserInput.Username,
 		Email:     createUserInput.Email,
 		Firstname: createUserInput.FirstName,
@@ -86,6 +88,7 @@ func (u *UserService) GetUser(ctx context.Context, userId int32) (users.User, er
 	errChan := make(chan error)
 
 	go func() {
+		log.Println(userId)
 		user, err := u.userDbQuries.GetUserById(timeoutCtx, userId)
 		if err != nil {
 			errChan <- err
@@ -104,19 +107,29 @@ func (u *UserService) GetUser(ctx context.Context, userId int32) (users.User, er
 	}
 }
 func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, image multipart.File, imageHeader *multipart.FileHeader) error {
-	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
-	defer cancel()
+	timeoutCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel() // Make sure to call cancel to release resources when done
 
-	newImageId := uuid.New()
 	tx, err := u.userDb.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
-
 	txQuries := u.userDbQuries.WithTx(tx)
-	err = txQuries.UpdateUserProfileImage(ctx, users.UpdateUserProfileImageParams{
-		ID: userId,
+	profileImageId, err := txQuries.GetUserProfileImageByUserId(ctx, userId)
+	if err != nil {
+		return err
+	}
+
+	if profileImageId.Valid {
+		err := u.rpcClient.DeleteMedia(profileImageId.UUID)
+		if err != nil {
+			return err
+		}
+	}
+	newImageId := uuid.New()
+	err = txQuries.UpdateUserProfileImage(timeoutCtx, users.UpdateUserProfileImageParams{
+		UserID: userId,
 		ProfileImageID: uuid.NullUUID{
 			UUID:  newImageId,
 			Valid: true,
@@ -133,14 +146,16 @@ func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, 
 		imageBytes, err := io.ReadAll(image)
 		if err != nil {
 			errCh <- err
+			return
 		}
-		err = u.rpcClient.UploadImage(&rpc_client.ImageUpload{
+		err = u.rpcClient.UploadMedia(&rpc_client.ImageUpload{
 			ImageData:   imageBytes,
 			MediaId:     newImageId,
 			ContentType: imageHeader.Header.Get("Content-Type"),
 		})
 		if err != nil {
 			errCh <- err
+			return
 		}
 		successCh <- true
 	}()
@@ -155,8 +170,16 @@ func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, 
 	case err := <-errCh:
 		tx.Rollback()
 		return err
-	case <-ctx.Done():
+	case <-timeoutCtx.Done():
 		tx.Rollback()
-		return ctx.Err()
+		return timeoutCtx.Err()
 	}
+}
+
+func (u *UserService) GetUserProfileImage(ctx context.Context, userId int32) (uuid.UUID, error) {
+	mediaId, err := u.userDbQuries.GetUserProfileImageByUserId(ctx, userId)
+	if err != nil {
+		return uuid.UUID{}, err
+	}
+	return mediaId.UUID, nil
 }

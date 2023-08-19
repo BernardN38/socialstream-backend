@@ -1,6 +1,7 @@
 package rpc_server
 
 import (
+	"context"
 	"net/rpc"
 
 	"github.com/BernardN38/flutter-backend/user_service/service"
@@ -9,7 +10,7 @@ import (
 
 // Handler is the struct which exposes the User Server methods
 type RpcServer struct {
-	mediaService *service.UserService
+	userService *service.UserService
 }
 type ImageUpload struct {
 	ImageData   []byte
@@ -18,17 +19,22 @@ type ImageUpload struct {
 }
 
 // New returns the object for the RPC handler
-func NewRpcServer(mediaService service.UserService) *RpcServer {
+func NewRpcServer(userService *service.UserService) (*RpcServer, error) {
 	s := &RpcServer{
-		mediaService: &mediaService,
+		userService: userService,
 	}
 	err := rpc.Register(s)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return s
+	return s, nil
 }
 
-func (s *RpcServer) Test(payload ImageUpload, reply *error) error {
+func (s *RpcServer) GetUserProfileImageId(userId int32, reply *uuid.UUID) error {
+	profileImageMediaId, err := s.userService.GetUserProfileImage(context.Background(), userId)
+	if err != nil {
+		return err
+	}
+	*reply = profileImageMediaId
 	return nil
 }

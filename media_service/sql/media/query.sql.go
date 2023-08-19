@@ -27,3 +27,12 @@ func (q *Queries) CreateMedia(ctx context.Context, arg CreateMediaParams) (Mediu
 	err := row.Scan(&i.ID, &i.MediaID, &i.OwnerID)
 	return i, err
 }
+
+const deleteMedia = `-- name: DeleteMedia :exec
+DELETE FROM media WHERE media_id = $1
+`
+
+func (q *Queries) DeleteMedia(ctx context.Context, mediaID uuid.UUID) error {
+	_, err := q.db.ExecContext(ctx, deleteMedia, mediaID)
+	return err
+}

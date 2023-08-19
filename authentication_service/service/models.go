@@ -16,6 +16,7 @@ type LoginUserInput struct {
 }
 
 type UserCreatedMessage struct {
+	UserId    int32  `json:"userId"`
 	Username  string `json:"username"`
 	Email     string `json:"email"`
 	FirstName string `json:"firstName"`

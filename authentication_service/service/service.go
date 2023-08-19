@@ -60,7 +60,7 @@ func (a *AuthSerice) CreateUser(ctx context.Context, createUserInput CreateUserI
 			return errors.New("database error")
 		}
 	}
-	message, err := json.Marshal(UserCreatedMessage{Username: user.Username, Email: user.Email, FirstName: createUserInput.FirstName, LastName: createUserInput.LastName})
+	message, err := json.Marshal(UserCreatedMessage{Username: user.Username, UserId: user.ID, Email: user.Email, FirstName: createUserInput.FirstName, LastName: createUserInput.LastName})
 	if err != nil {
 		return err
 	}

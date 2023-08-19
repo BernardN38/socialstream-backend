@@ -54,6 +54,7 @@ services:
       - APP_DB_PASS=password
       - AUTH_DB_NAME=authentication_service
       - USER_DB_NAME=user_service
+      - MEDIA_DB_NAME=media_service
       - PGUSER=postgres
     logging:
       options:

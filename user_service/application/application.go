@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/rpc"
 	"time"
@@ -13,6 +14,7 @@ import (
 	rabbitmq_consumer "github.com/BernardN38/flutter-backend/user_service/rabbitmq/consumer"
 
 	rpc_client "github.com/BernardN38/flutter-backend/user_service/rpc/client"
+	rpc_server "github.com/BernardN38/flutter-backend/user_service/rpc/server"
 	"github.com/BernardN38/flutter-backend/user_service/service"
 
 	"github.com/go-chi/chi/v5"
@@ -41,7 +43,11 @@ func New() *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	// start the rpc server
+	l, err := net.Listen("tcp", ":8081")
+	if err != nil {
+		log.Fatal(err)
+	}
 	//connect to postgres db
 	db, err := sql.Open("postgres", config.PostgresDsn)
 	if err != nil {
@@ -61,11 +67,10 @@ func New() *Application {
 	}
 	minioClient := ConnectToMinio(config)
 
-	medaiServiceRpcClient, err := rpc.Dial("tcp", "media-service:8081")
+	medaiServiceRpcClient, err := ConnectToRpcServer("media-service:8081", 5, 10*time.Second)
 	if err != nil {
 		log.Fatal(err)
 	}
-
 	rpcClient, err := rpc_client.New(medaiServiceRpcClient)
 	if err != nil {
 		log.Fatal(err)
@@ -89,6 +94,17 @@ func New() *Application {
 		}
 	}(rabbitConsumer)
 
+	go func() {
+		rpc_server.NewRpcServer(userService)
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			go rpc.ServeConn(conn)
+		}
+	}()
 	// init jwt token manager with env secret key
 	tokenManager := jwtauth.New("HS256", []byte(config.JwtSecret), nil)
 
@@ -151,7 +167,6 @@ func ConnectRabbitMQWithRetry(amqpURL string, maxRetries int, retryInterval time
 }
 
 func ConnectToMinio(config *config) *minio.Client {
-	log.Println(config.MinioEndpoint, config.MinioAccessKeyID, config.MinioSecretAccessKey)
 	useSSL := false
 	// Initialize minio client object.
 	minioClient, err := minio.New("minio:9000", &minio.Options{
@@ -162,4 +177,21 @@ func ConnectToMinio(config *config) *minio.Client {
 		log.Fatalln(err)
 	}
 	return minioClient
+}
+
+func ConnectToRpcServer(address string, retries int, retryInterval time.Duration) (*rpc.Client, error) {
+	var userServiceRpcClient *rpc.Client
+	var err error
+
+	for i := 0; i < retries; i++ {
+		userServiceRpcClient, err = rpc.Dial("tcp", address)
+		if err == nil {
+			return userServiceRpcClient, nil
+		}
+
+		log.Printf("Error connecting to user service. Retrying in %s...\n", retryInterval)
+		time.Sleep(retryInterval)
+	}
+
+	return nil, err
 }

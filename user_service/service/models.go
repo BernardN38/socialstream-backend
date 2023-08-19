@@ -3,6 +3,7 @@ package service
 import "github.com/go-playground/validator/v10"
 
 type CreateUserInput struct {
+	UserId    int32  `json:"userId" validate:"required"`
 	Username  string `json:"username" validate:"required"`
 	Email     string `json:"email" validate:"required,email"`
 	FirstName string `json:"firstName" validate:"required"`
