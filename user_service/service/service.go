@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"io"
-	"log"
 	"mime/multipart"
 	"time"
 
@@ -88,7 +87,6 @@ func (u *UserService) GetUser(ctx context.Context, userId int32) (users.User, er
 	errChan := make(chan error)
 
 	go func() {
-		log.Println(userId)
 		user, err := u.userDbQuries.GetUserById(timeoutCtx, userId)
 		if err != nil {
 			errChan <- err
@@ -107,8 +105,8 @@ func (u *UserService) GetUser(ctx context.Context, userId int32) (users.User, er
 	}
 }
 func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, image multipart.File, imageHeader *multipart.FileHeader) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
-	defer cancel() // Make sure to call cancel to release resources when done
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
+	defer cancel()
 
 	tx, err := u.userDb.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {

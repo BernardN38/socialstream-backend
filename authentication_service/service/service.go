@@ -7,7 +7,7 @@ import (
 	"errors"
 	"log"
 
-	"github.com/BernardN38/flutter-backend/authentication_service/rabbitmq"
+	rabbitmq_producer "github.com/BernardN38/flutter-backend/authentication_service/rabbitmq/producer"
 	"github.com/BernardN38/flutter-backend/authentication_service/sql/users"
 	"github.com/lib/pq"
 )
@@ -15,10 +15,10 @@ import (
 type AuthSerice struct {
 	authDb           *sql.DB
 	authDbQuries     *users.Queries
-	rabbitmqProducer rabbitmq.RabbitMQProducerInterface
+	rabbitmqProducer rabbitmq_producer.RabbitMQProducerInterface
 }
 
-func New(authDb *sql.DB, rabbitmqProducer rabbitmq.RabbitMQProducerInterface) *AuthSerice {
+func New(authDb *sql.DB, rabbitmqProducer rabbitmq_producer.RabbitMQProducerInterface) *AuthSerice {
 	authDbQueries := users.New(authDb)
 	return &AuthSerice{
 		authDb:           authDb,

@@ -60,6 +60,7 @@ func (h *Handler) UploadUserProfileImage(w http.ResponseWriter, r *http.Request)
 	userId := chi.URLParam(r, "userId")
 	userIdInt, err := strconv.Atoi(userId)
 	if err != nil {
+		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -67,12 +68,14 @@ func (h *Handler) UploadUserProfileImage(w http.ResponseWriter, r *http.Request)
 	ctxUserId := claims["user_id"].(float64)
 
 	if int(ctxUserId) != userIdInt {
+		log.Println("userId does not match token")
 		http.Error(w, "unathorized", http.StatusUnauthorized)
 		return
 	}
 	// Parse the incoming form data
 	err = r.ParseMultipartForm(10 << 20) // 20MB limit
 	if err != nil {
+		log.Println(err)
 		http.Error(w, "Unable to parse form", http.StatusBadRequest)
 		return
 	}
@@ -80,6 +83,7 @@ func (h *Handler) UploadUserProfileImage(w http.ResponseWriter, r *http.Request)
 	// Get the file from the "image" field in the form
 	file, header, err := r.FormFile("image")
 	if err != nil {
+		log.Println(err)
 		http.Error(w, "Unable to get file from request", http.StatusBadRequest)
 		return
 	}

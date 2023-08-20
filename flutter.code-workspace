@@ -11,6 +11,9 @@
     },
     {
       "path": "media_service"
+    },
+    {
+      "path": "image_proccessing_service"
     }
   ],
   "settings": {}
