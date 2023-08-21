@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/BernardN38/flutter-backend/authentication_service/handler"
-	"github.com/BernardN38/flutter-backend/authentication_service/rabbitmq"
+	rabbitmq_producer "github.com/BernardN38/flutter-backend/authentication_service/rabbitmq/producer"
+
 	"github.com/BernardN38/flutter-backend/authentication_service/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
@@ -51,7 +52,7 @@ func New() *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
-	rabbitmqProducer, err := rabbitmq.NewRabbitMQProducer(rabbitmqConn, "user_events")
+	rabbitmqProducer, err := rabbitmq_producer.NewRabbitMQProducer(rabbitmqConn, "user_events")
 	if err != nil {
 		log.Fatal(err)
 	}

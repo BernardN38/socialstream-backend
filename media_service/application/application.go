@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/BernardN38/flutter-backend/media_service/handler"
-	"github.com/BernardN38/flutter-backend/media_service/rabbitmq"
+	rabbitmq_comsumer "github.com/BernardN38/flutter-backend/media_service/rabbitmq/consumer"
+	rabbitmq_producer "github.com/BernardN38/flutter-backend/media_service/rabbitmq/producer"
+
 	rpc_client "github.com/BernardN38/flutter-backend/media_service/rpc/client"
 	rpc_server "github.com/BernardN38/flutter-backend/media_service/rpc/server"
 	"github.com/BernardN38/flutter-backend/media_service/service"
@@ -73,8 +75,13 @@ func New() *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	rabbitmqProducer, err := rabbitmq_producer.NewRabbitMQProducer(rabbitmqConn, "media_events")
+	if err != nil {
+		log.Fatal(err)
+	}
 	//init service layer
-	mediaService, err := service.New(minioClient, db, rpcClient, service.MediaServiceConfig{MinioBucketName: config.MinioBucketName})
+	mediaService, err := service.New(minioClient, db, rpcClient, rabbitmqProducer, service.MediaServiceConfig{MinioBucketName: config.MinioBucketName})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -92,12 +99,12 @@ func New() *Application {
 		}
 	}()
 	// init rabbitmq Consumer and inject userService to handle messages
-	rabbitConsumer, err := rabbitmq.NewRabbitMQConsumer(rabbitmqConn, "media-service", mediaService)
+	rabbitConsumer, err := rabbitmq_comsumer.NewRabbitMQConsumer(rabbitmqConn, "media-service", mediaService)
 	if err != nil {
 		log.Fatal(err)
 	}
 	//run consumer async
-	go func(rabbitConsumer *rabbitmq.RabbitMQConsumer) {
+	go func(rabbitConsumer *rabbitmq_comsumer.RabbitMQConsumer) {
 		err := rabbitConsumer.Consume()
 		if err != nil {
 			log.Fatal(err)

@@ -190,3 +190,20 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+
+  image-proccessing-service:
+    build:
+      context: ../image_proccessing_service
+      dockerfile: ./image-proccessing-service.dockerfile
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+            limits:
+              cpus: "1"
+              memory: 4G
+            reservations:
+              cpus: "0.25"
+              memory: 128M

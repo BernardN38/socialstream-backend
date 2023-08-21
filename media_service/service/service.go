@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"log"
 	"time"
 
+	rabbitmq_producer "github.com/BernardN38/flutter-backend/media_service/rabbitmq/producer"
 	rpc_client "github.com/BernardN38/flutter-backend/media_service/rpc/client"
 	media_sql "github.com/BernardN38/flutter-backend/media_service/sql/media"
 	"github.com/google/uuid"
@@ -14,11 +17,12 @@ import (
 )
 
 type MediaService struct {
-	minioClient  *minio.Client
-	mediaDb      *sql.DB
-	mediaQueries *media_sql.Queries
-	rpcClient    *rpc_client.RpcClient
-	config       *MediaServiceConfig
+	minioClient      *minio.Client
+	mediaDb          *sql.DB
+	mediaQueries     *media_sql.Queries
+	rpcClient        *rpc_client.RpcClient
+	rabbitmqProducer *rabbitmq_producer.RabbitMQProducer
+	config           *MediaServiceConfig
 }
 type RpcImageUpload struct {
 	MediaData   []byte
@@ -29,7 +33,7 @@ type MediaServiceConfig struct {
 	MinioBucketName string
 }
 
-func New(minioClient *minio.Client, mediaDb *sql.DB, rpcClient *rpc_client.RpcClient, config MediaServiceConfig) (*MediaService, error) {
+func New(minioClient *minio.Client, mediaDb *sql.DB, rpcClient *rpc_client.RpcClient, rabbitmqProducer *rabbitmq_producer.RabbitMQProducer, config MediaServiceConfig) (*MediaService, error) {
 	mediaQueries := media_sql.New(mediaDb)
 
 	err := SetupMinio(minioClient, config.MinioBucketName)
@@ -37,11 +41,12 @@ func New(minioClient *minio.Client, mediaDb *sql.DB, rpcClient *rpc_client.RpcCl
 		return nil, err
 	}
 	return &MediaService{
-		minioClient:  minioClient,
-		mediaDb:      mediaDb,
-		mediaQueries: mediaQueries,
-		rpcClient:    rpcClient,
-		config:       &config,
+		minioClient:      minioClient,
+		mediaDb:          mediaDb,
+		mediaQueries:     mediaQueries,
+		rpcClient:        rpcClient,
+		rabbitmqProducer: rabbitmqProducer,
+		config:           &config,
 	}, nil
 }
 
@@ -67,17 +72,17 @@ func (m *MediaService) GetImage(ctx context.Context, imageId uuid.UUID) (*minio.
 		return nil, ctx.Err()
 	}
 }
-func (u *MediaService) UploadMedia(ctx context.Context, payload RpcImageUpload) error {
-	ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+func (m *MediaService) UploadMedia(ctx context.Context, payload RpcImageUpload) error {
+	ctx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
 	defer cancel()
 
-	tx, err := u.mediaDb.BeginTx(ctx, &sql.TxOptions{})
+	tx, err := m.mediaDb.BeginTx(ctx, &sql.TxOptions{})
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	txQuries := u.mediaQueries.WithTx(tx)
+	txQuries := m.mediaQueries.WithTx(tx)
 	_, err = txQuries.CreateMedia(ctx, media_sql.CreateMediaParams{
 		MediaID: payload.MediaId,
 		OwnerID: 1,
@@ -90,13 +95,25 @@ func (u *MediaService) UploadMedia(ctx context.Context, payload RpcImageUpload) 
 	errCh := make(chan error)
 
 	go func() {
-		info, err := u.minioClient.PutObject(ctx, u.config.MinioBucketName, payload.MediaId.String(), bytes.NewReader(payload.MediaData), int64(len(payload.MediaData)), minio.PutObjectOptions{
+		info, err := m.minioClient.PutObject(ctx, m.config.MinioBucketName, payload.MediaId.String(), bytes.NewReader(payload.MediaData), int64(len(payload.MediaData)), minio.PutObjectOptions{
 			ContentType: payload.ContentType,
 		})
 		if err != nil {
 			errCh <- err
 			return
 		}
+		msg, err := json.Marshal(struct {
+			MediaId     string `json:"mediaId"`
+			ContentType string `json:"contentType"`
+		}{
+			MediaId:     payload.MediaId.String(),
+			ContentType: payload.ContentType,
+		})
+		if err != nil {
+			errCh <- errors.New("error publishing message")
+			return
+		}
+		m.rabbitmqProducer.Publish("media.uploaded", msg)
 		infoCh <- info
 	}()
 
@@ -150,7 +167,6 @@ func (m *MediaService) DeleteMedia(ctx context.Context, mediaId uuid.UUID) error
 		if err != nil {
 			return err
 		}
-		log.Println("media deleted: ", mediaId)
 		return nil
 	case err := <-errCh:
 		tx.Rollback()
@@ -189,3 +205,40 @@ func (m *MediaService) GetUserProfileImage(reqCtx context.Context, userId int32)
 		return nil, ctx.Err()
 	}
 }
+
+// testing compression
+// func compressAndLogSizes(inputData []byte, quality int) (*bytes.Buffer, error) {
+// 	startTime := time.Now().UnixMilli()
+// 	// Create an image.Image from the byte slice
+// 	img, _, err := image.Decode(bytes.NewReader(inputData))
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Compress the image
+// 	var compressedBufferBefore bytes.Buffer
+// 	err = jpeg.Encode(&compressedBufferBefore, img, nil)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Get the size before compression
+// 	sizeBefore := len(compressedBufferBefore.Bytes())
+
+// 	// Set the compression options
+// 	var opt jpeg.Options
+// 	opt.Quality = quality
+
+// 	// Compress the image with specified quality
+// 	var compressedBufferAfter bytes.Buffer
+// 	err = jpeg.Encode(&compressedBufferAfter, img, &opt)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	// Get the size after compression
+// 	sizeAfter := len(compressedBufferAfter.Bytes())
+// 	endTime := time.Now().UnixMilli()
+// 	fmt.Println("runtime: ", endTime-startTime, "size before: ", sizeBefore, "size after: ", sizeAfter)
+// 	return &compressedBufferAfter, nil
+// }
