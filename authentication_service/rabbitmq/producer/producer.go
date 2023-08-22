@@ -24,8 +24,8 @@ func NewRabbitMQProducer(conn *amqp.Connection, exchangeName string) (*RabbitMQP
 	}
 	err = channel.ExchangeDeclare(
 		exchangeName,
-		"fanout",
-		false,
+		"topic",
+		true,
 		false,
 		false,
 		false,
@@ -66,7 +66,7 @@ func (p *RabbitMQProducer) Publish(topic string, message []byte) error {
 		false,      // mandatory: false means the message can be silently dropped if no queue is bound to the exchange
 		false,      // immediate: false means the message can be queued if it can't be delivered immediately
 		amqp.Publishing{
-			ContentType: "text/plain",
+			ContentType: "application/json",
 			Body:        message,
 		},
 	)

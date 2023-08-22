@@ -22,6 +22,13 @@ ORDER BY user_id;
 INSERT INTO users(user_id, username,email, firstname,lastname)
 VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
+-- name: UpdateUser :exec
+UPDATE users SET 
+username = COALESCE(nullif($2, ''), username),
+firstname = COALESCE(nullif($3, ''), firstname), 
+lastname = COALESCE(nullif($4, ''),  lastname)
+WHERE user_id = $1;
+
 -- name: UpdateUserProfileImage :exec
 UPDATE users SET profile_image_id = $2 WHERE user_id = $1;
 

@@ -25,8 +25,8 @@ func NewRabbitMQConsumer(conn *amqp.Connection, queueName string, userService *s
 
 	err = channel.ExchangeDeclare(
 		"user_events",
-		"fanout",
-		false,
+		"topic",
+		true,
 		false,
 		false,
 		false,
@@ -49,7 +49,7 @@ func NewRabbitMQConsumer(conn *amqp.Connection, queueName string, userService *s
 		return nil, err
 	}
 
-	err = channel.QueueBind(queue.Name, "", "user_events", false, nil)
+	err = channel.QueueBind(queue.Name, "user.created", "user_events", false, nil)
 	if err != nil {
 		return nil, err
 	}

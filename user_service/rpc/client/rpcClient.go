@@ -6,14 +6,14 @@ import (
 	"github.com/google/uuid"
 )
 
-type ImageUpload struct {
+type RpcClient struct {
+	mediaServiceRpcClient *rpc.Client
+}
+
+type RpcImageUpload struct {
 	ImageData   []byte
 	MediaId     uuid.UUID
 	ContentType string
-}
-
-type RpcClient struct {
-	mediaServiceRpcClient *rpc.Client
 }
 
 func New(mediaServiceClient *rpc.Client) (*RpcClient, error) {
@@ -22,7 +22,7 @@ func New(mediaServiceClient *rpc.Client) (*RpcClient, error) {
 	}, nil
 }
 
-func (rc *RpcClient) UploadMedia(ImageUpload *ImageUpload) error {
+func (rc *RpcClient) UploadMedia(ImageUpload *RpcImageUpload) error {
 	var replyErr error
 	err := rc.mediaServiceRpcClient.Call("RpcServer.UploadImage", ImageUpload, &replyErr)
 	if err != nil {
