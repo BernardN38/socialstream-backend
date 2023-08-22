@@ -1,4 +1,4 @@
-module github.com/BernardN38/flutter-backend/media_service
+module github.com/BernardN38/socialstream-backend/media_service
 
 go 1.21.0
 

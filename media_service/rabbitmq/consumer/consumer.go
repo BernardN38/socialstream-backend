@@ -3,7 +3,7 @@ package rabbitmq_comsumer
 import (
 	"log"
 
-	"github.com/BernardN38/flutter-backend/media_service/service"
+	"github.com/BernardN38/socialstream-backend/media_service/service"
 	"github.com/streadway/amqp"
 )
 

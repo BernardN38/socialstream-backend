@@ -1,3 +1,5 @@
+github.com/BernardN38/flutter-backend/media_service v0.0.0-20230821031608-60de387ebfb4 h1:PB7ERvD0zy5F+4t2aaVG3ZI9I20sEgaVe/mX6mYdKjU=
+github.com/BernardN38/flutter-backend/media_service v0.0.0-20230821031608-60de387ebfb4/go.mod h1:evLg+0V6JohdQWefx4yNmXArCtRtbzAJwhMxp6Ujdpk=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=

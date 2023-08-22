@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/BernardN38/flutter-backend/user_service/service"
+	"github.com/BernardN38/socialstream-backend/user_service/service"
 	"github.com/streadway/amqp"
 )
 

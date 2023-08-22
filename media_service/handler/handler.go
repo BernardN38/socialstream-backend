@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/BernardN38/flutter-backend/media_service/service"
+	"github.com/BernardN38/socialstream-backend/media_service/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 )

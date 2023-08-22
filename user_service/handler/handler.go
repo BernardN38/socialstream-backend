@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/BernardN38/flutter-backend/user_service/service"
+	"github.com/BernardN38/socialstream-backend/user_service/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 )
@@ -60,6 +60,7 @@ func (h *Handler) UploadUserProfileImage(w http.ResponseWriter, r *http.Request)
 	userId := chi.URLParam(r, "userId")
 	userIdInt, err := strconv.Atoi(userId)
 	if err != nil {
+
 		log.Println(err)
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return

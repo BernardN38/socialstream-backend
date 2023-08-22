@@ -3,7 +3,7 @@ package application
 import (
 	"time"
 
-	"github.com/BernardN38/flutter-backend/media_service/handler"
+	"github.com/BernardN38/socialstream-backend/media_service/handler"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/jwtauth/v5"

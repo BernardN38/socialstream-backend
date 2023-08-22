@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/rpc"
 
-	"github.com/BernardN38/flutter-backend/user_service/service"
+	"github.com/BernardN38/socialstream-backend/user_service/service"
 	"github.com/google/uuid"
 )
 

@@ -8,10 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/BernardN38/flutter-backend/authentication_service/handler"
-	rabbitmq_producer "github.com/BernardN38/flutter-backend/authentication_service/rabbitmq/producer"
-
-	"github.com/BernardN38/flutter-backend/authentication_service/service"
+	"github.com/BernardN38/socialstream-backend/authentication_service/handler"
+	rabbitmq_producer "github.com/BernardN38/socialstream-backend/authentication_service/rabbitmq/producer"
+	"github.com/BernardN38/socialstream-backend/authentication_service/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	_ "github.com/lib/pq"
