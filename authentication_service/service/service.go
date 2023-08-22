@@ -7,8 +7,8 @@ import (
 	"errors"
 	"log"
 
-	rabbitmq_producer "github.com/BernardN38/flutter-backend/authentication_service/rabbitmq/producer"
-	"github.com/BernardN38/flutter-backend/authentication_service/sql/users"
+	rabbitmq_producer "github.com/BernardN38/socialstream-backend/authentication_service/rabbitmq/producer"
+	"github.com/BernardN38/socialstream-backend/authentication_service/sql/users"
 	"github.com/lib/pq"
 )
 

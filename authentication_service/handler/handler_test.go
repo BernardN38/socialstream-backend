@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/BernardN38/flutter-backend/authentication_service/service"
+	"github.com/BernardN38/socialstream-backend/authentication_service/service"
 	"github.com/go-chi/jwtauth/v5"
 	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"

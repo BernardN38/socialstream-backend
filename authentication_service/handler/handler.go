@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/BernardN38/flutter-backend/authentication_service/service"
+	"github.com/BernardN38/socialstream-backend/authentication_service/service"
 	"github.com/go-chi/jwtauth/v5"
 	_ "github.com/lib/pq"
 )
@@ -96,7 +96,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,           // HttpOnly flag for added security
 		Secure:   false,
 		SameSite: http.SameSiteNoneMode,
-		Domain:   "192.168.0.188",
+		Domain:   "192.168.0.189",
 		Path:     "/",
 	}
 

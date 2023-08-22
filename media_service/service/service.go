@@ -9,9 +9,9 @@ import (
 	"log"
 	"time"
 
-	rabbitmq_producer "github.com/BernardN38/flutter-backend/media_service/rabbitmq/producer"
-	rpc_client "github.com/BernardN38/flutter-backend/media_service/rpc/client"
-	media_sql "github.com/BernardN38/flutter-backend/media_service/sql/media"
+	rabbitmq_producer "github.com/BernardN38/socialstream-backend/media_service/rabbitmq/producer"
+	rpc_client "github.com/BernardN38/socialstream-backend/media_service/rpc/client"
+	media_sql "github.com/BernardN38/socialstream-backend/media_service/sql/media"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 )

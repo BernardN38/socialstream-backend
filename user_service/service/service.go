@@ -8,8 +8,8 @@ import (
 	"mime/multipart"
 	"time"
 
-	rpc_client "github.com/BernardN38/flutter-backend/user_service/rpc/client"
-	"github.com/BernardN38/flutter-backend/user_service/sql/users"
+	rpc_client "github.com/BernardN38/socialstream-backend/user_service/rpc/client"
+	"github.com/BernardN38/socialstream-backend/user_service/sql/users"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 )

@@ -10,14 +10,12 @@ import (
 	"net/rpc"
 	"time"
 
-	"github.com/BernardN38/flutter-backend/media_service/handler"
-	rabbitmq_comsumer "github.com/BernardN38/flutter-backend/media_service/rabbitmq/consumer"
-	rabbitmq_producer "github.com/BernardN38/flutter-backend/media_service/rabbitmq/producer"
-
-	rpc_client "github.com/BernardN38/flutter-backend/media_service/rpc/client"
-	rpc_server "github.com/BernardN38/flutter-backend/media_service/rpc/server"
-	"github.com/BernardN38/flutter-backend/media_service/service"
-
+	"github.com/BernardN38/socialstream-backend/media_service/handler"
+	rabbitmq_comsumer "github.com/BernardN38/socialstream-backend/media_service/rabbitmq/consumer"
+	rabbitmq_producer "github.com/BernardN38/socialstream-backend/media_service/rabbitmq/producer"
+	rpc_client "github.com/BernardN38/socialstream-backend/media_service/rpc/client"
+	rpc_server "github.com/BernardN38/socialstream-backend/media_service/rpc/server"
+	"github.com/BernardN38/socialstream-backend/media_service/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/jwtauth/v5"
 	_ "github.com/lib/pq"
@@ -71,6 +69,7 @@ func New() *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
+
 	rpcClient, err := rpc_client.New(userServiceRpcClient)
 	if err != nil {
 		log.Fatal(err)
@@ -87,6 +86,7 @@ func New() *Application {
 	}
 
 	go func() {
+
 		rpc_server.New(mediaService)
 		// start the rpc server
 		for {
