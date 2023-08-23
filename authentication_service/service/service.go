@@ -34,6 +34,13 @@ func (a *AuthSerice) GetAllUsers(ctx context.Context) ([]users.GetAllUsersRow, e
 	return users, nil
 }
 
+func (a *AuthSerice) DeleteUser(ctx context.Context, userId int32) error {
+	err := a.authDbQuries.DeleteUser(ctx, userId)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (a *AuthSerice) CreateUser(ctx context.Context, createUserInput CreateUserInput, role string) error {
 	if role == "" {
 		role = "user"

@@ -95,7 +95,6 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		Expires:  expirationTime, // Cookie expiration time (30 minutes)
 		HttpOnly: true,           // HttpOnly flag for added security
 		Secure:   false,
-		SameSite: http.SameSiteNoneMode,
 		Domain:   "192.168.0.189",
 		Path:     "/",
 	}

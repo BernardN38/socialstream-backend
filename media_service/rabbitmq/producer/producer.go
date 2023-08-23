@@ -25,7 +25,7 @@ func NewRabbitMQProducer(conn *amqp.Connection, exchangeName string) (*RabbitMQP
 	err = channel.ExchangeDeclare(
 		exchangeName,
 		"topic",
-		false,
+		true,
 		false,
 		false,
 		false,

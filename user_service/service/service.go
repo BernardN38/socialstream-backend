@@ -3,11 +3,13 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"io"
 	"mime/multipart"
 	"time"
 
+	rabbitmq_producer "github.com/BernardN38/socialstream-backend/user_service/rabbitmq/producer"
 	rpc_client "github.com/BernardN38/socialstream-backend/user_service/rpc/client"
 	"github.com/BernardN38/socialstream-backend/user_service/sql/users"
 	"github.com/google/uuid"
@@ -15,28 +17,30 @@ import (
 )
 
 type UserService struct {
-	userDb       *sql.DB
-	userDbQuries *users.Queries
-	minioClient  *minio.Client
-	rpcClient    *rpc_client.RpcClient
-	config       *UserServiceConfig
+	userDb           *sql.DB
+	userDbQuries     *users.Queries
+	minioClient      *minio.Client
+	rpcClient        *rpc_client.RpcClient
+	rabbitmqPorducer *rabbitmq_producer.RabbitMQProducer
+	config           *UserServiceConfig
 }
 type UserServiceConfig struct {
 	MinioBucketName string
 }
 
-func New(userDb *sql.DB, minioClient *minio.Client, rpcClient *rpc_client.RpcClient, config UserServiceConfig) (*UserService, error) {
+func New(userDb *sql.DB, minioClient *minio.Client, rpcClient *rpc_client.RpcClient, rabbitmqProducer *rabbitmq_producer.RabbitMQProducer, config UserServiceConfig) (*UserService, error) {
 	userDbQueries := users.New(userDb)
 	err := setup(*minioClient, "user-service")
 	if err != nil {
 		return nil, err
 	}
 	return &UserService{
-		userDb:       userDb,
-		userDbQuries: userDbQueries,
-		minioClient:  minioClient,
-		rpcClient:    rpcClient,
-		config:       &config,
+		userDb:           userDb,
+		userDbQuries:     userDbQueries,
+		minioClient:      minioClient,
+		rpcClient:        rpcClient,
+		rabbitmqPorducer: rabbitmqProducer,
+		config:           &config,
 	}, nil
 }
 
@@ -104,11 +108,79 @@ func (u *UserService) GetUser(ctx context.Context, userId int32) (users.User, er
 		return users.User{}, err
 	}
 }
+
+func (u *UserService) UpdateUser(ctx context.Context, userId int32, updateUserInput UpdateUserInput) error {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+	errCh := make(chan error)
+	successCh := make(chan interface{})
+	go func() {
+		err := u.userDbQuries.UpdateUser(timeoutCtx, users.UpdateUserParams{
+			UserID:  userId,
+			Column2: updateUserInput.Username,
+			Column3: updateUserInput.FirstName,
+			Column4: updateUserInput.LastName,
+		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		successCh <- struct{}{}
+	}()
+	select {
+	case err := <-errCh:
+		return err
+	case <-successCh:
+		return nil
+	case <-timeoutCtx.Done():
+		return timeoutCtx.Err()
+	}
+}
+
+func (u *UserService) DeleteUser(ctx context.Context, userId int32) error {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
+	defer cancel()
+	tx, err := u.userDb.BeginTx(timeoutCtx, &sql.TxOptions{})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	txQuries := u.userDbQuries.WithTx(tx)
+	errCh := make(chan error)
+	successCh := make(chan interface{})
+	go func() {
+		err := txQuries.DeleteUser(timeoutCtx, userId)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		msgBytes, err := json.Marshal(rabbitmq_producer.UserDeletedMessage{
+			UserId: userId,
+		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		u.rabbitmqPorducer.Publish("user.deleted", msgBytes)
+		successCh <- struct{}{}
+	}()
+	select {
+	case err := <-errCh:
+		tx.Rollback()
+		return err
+	case <-successCh:
+		tx.Commit()
+		return nil
+	case <-timeoutCtx.Done():
+		tx.Rollback()
+		return timeoutCtx.Err()
+	}
+}
 func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, image multipart.File, imageHeader *multipart.FileHeader) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
 	defer cancel()
 
-	tx, err := u.userDb.BeginTx(ctx, &sql.TxOptions{})
+	tx, err := u.userDb.BeginTx(timeoutCtx, &sql.TxOptions{})
 	if err != nil {
 		return err
 	}
@@ -146,7 +218,7 @@ func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, 
 			errCh <- err
 			return
 		}
-		err = u.rpcClient.UploadMedia(&rpc_client.ImageUpload{
+		err = u.rpcClient.UploadMedia(&rpc_client.RpcImageUpload{
 			ImageData:   imageBytes,
 			MediaId:     newImageId,
 			ContentType: imageHeader.Header.Get("Content-Type"),

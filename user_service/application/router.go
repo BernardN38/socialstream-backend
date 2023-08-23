@@ -25,6 +25,8 @@ func SetupRouter(h *handler.Handler, tm *jwtauth.JWTAuth) *chi.Mux {
 		r.Use(jwtauth.Verifier(tm))
 		r.Use(jwtauth.Authenticator)
 		r.Post("/api/v1/users/{userId}/profileImage", h.UploadUserProfileImage)
+		r.Patch("/api/v1/users/{userId}", h.UpdateUser)
+		r.Delete("/api/v1/users/{userId}", h.DeleteUser)
 	})
 	return r
 }

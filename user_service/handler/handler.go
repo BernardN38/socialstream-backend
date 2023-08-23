@@ -96,3 +96,64 @@ func (h *Handler) UploadUserProfileImage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 }
+
+func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	userId := chi.URLParam(r, "userId")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	ctxUserId := claims["user_id"].(float64)
+
+	if int(ctxUserId) != userIdInt {
+		log.Println("userId does not match token")
+		http.Error(w, "unathorized", http.StatusUnauthorized)
+		return
+	}
+	var updateUserReq UpdateUserRequest
+	err = json.NewDecoder(r.Body).Decode(&updateUserReq)
+	if err != nil {
+		http.Error(w, "unable to decode json body", http.StatusBadRequest)
+		return
+	}
+	err = Validate(updateUserReq)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	err = h.UserService.UpdateUser(r.Context(), int32(ctxUserId), service.UpdateUserInput(updateUserReq))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+func (h *Handler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	userId := chi.URLParam(r, "userId")
+	userIdInt, err := strconv.Atoi(userId)
+	if err != nil {
+
+		log.Println(err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	_, claims, _ := jwtauth.FromContext(r.Context())
+	ctxUserId := claims["user_id"].(float64)
+
+	if int(ctxUserId) != userIdInt {
+		log.Println("userId does not match token")
+		http.Error(w, "unathorized", http.StatusUnauthorized)
+		return
+	}
+
+	err = h.UserService.DeleteUser(r.Context(), int32(ctxUserId))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}

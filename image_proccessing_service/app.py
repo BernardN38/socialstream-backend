@@ -104,7 +104,7 @@ def worker(queue_name):
 
     # Declare the exchange
     exchange_name = 'media_events'
-    channel.exchange_declare(exchange=exchange_name, exchange_type='topic')
+    channel.exchange_declare(exchange=exchange_name, exchange_type='topic', durable=True)
 
     channel.queue_declare(queue=queue_name, durable=True)  
     channel.queue_bind(exchange=exchange_name, queue=queue_name, routing_key="media.uploaded")

@@ -9,6 +9,11 @@ type CreateUserInput struct {
 	FirstName string `json:"firstName" validate:"required"`
 	LastName  string `json:"lastName" validate:"required"`
 }
+type UpdateUserInput struct {
+	Username  string `json:"username"`
+	FirstName string `json:"firstName"`
+	LastName  string `json:"lastName"`
+}
 
 func Validate(input interface{}) error {
 	validate := validator.New()

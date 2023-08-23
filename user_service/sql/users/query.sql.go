@@ -144,6 +144,31 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 	return items, nil
 }
 
+const updateUser = `-- name: UpdateUser :exec
+UPDATE users SET 
+username = COALESCE(nullif($2, ''), username),
+firstname = COALESCE(nullif($3, ''), firstname), 
+lastname = COALESCE(nullif($4, ''),  lastname)
+WHERE user_id = $1
+`
+
+type UpdateUserParams struct {
+	UserID  int32       `json:"userId"`
+	Column2 interface{} `json:"column2"`
+	Column3 interface{} `json:"column3"`
+	Column4 interface{} `json:"column4"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.ExecContext(ctx, updateUser,
+		arg.UserID,
+		arg.Column2,
+		arg.Column3,
+		arg.Column4,
+	)
+	return err
+}
+
 const updateUserProfileImage = `-- name: UpdateUserProfileImage :exec
 UPDATE users SET profile_image_id = $2 WHERE user_id = $1
 `

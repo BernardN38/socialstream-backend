@@ -24,7 +24,7 @@ func NewRabbitMQConsumer(conn *amqp.Connection, queueName string, userService *s
 	err = channel.ExchangeDeclare(
 		"media_events",
 		"topic",
-		false,
+		true,
 		false,
 		false,
 		false,

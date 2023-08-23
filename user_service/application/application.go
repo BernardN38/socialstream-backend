@@ -12,6 +12,7 @@ import (
 
 	"github.com/BernardN38/socialstream-backend/user_service/handler"
 	rabbitmq_consumer "github.com/BernardN38/socialstream-backend/user_service/rabbitmq/consumer"
+	rabbitmq_producer "github.com/BernardN38/socialstream-backend/user_service/rabbitmq/producer"
 	rpc_client "github.com/BernardN38/socialstream-backend/user_service/rpc/client"
 	rpc_server "github.com/BernardN38/socialstream-backend/user_service/rpc/server"
 	"github.com/BernardN38/socialstream-backend/user_service/service"
@@ -73,8 +74,13 @@ func New() *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	rabbitmqProducer, err := rabbitmq_producer.NewRabbitMQProducer(rabbitmqConn, "user_events")
+	if err != nil {
+		log.Fatal(err)
+	}
 	//init service layer
-	userService, err := service.New(db, minioClient, rpcClient, service.UserServiceConfig{MinioBucketName: config.MinioBucketName})
+	userService, err := service.New(db, minioClient, rpcClient, rabbitmqProducer, service.UserServiceConfig{MinioBucketName: config.MinioBucketName})
 	if err != nil {
 		log.Fatal(err)
 	}

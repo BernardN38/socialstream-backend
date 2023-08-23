@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/BernardN38/socialstream-backend/authentication_service/handler"
+	rabbitmq_consumer "github.com/BernardN38/socialstream-backend/authentication_service/rabbitmq/consumer"
 	rabbitmq_producer "github.com/BernardN38/socialstream-backend/authentication_service/rabbitmq/producer"
 	"github.com/BernardN38/socialstream-backend/authentication_service/service"
 	"github.com/go-chi/chi/v5"
@@ -57,6 +58,19 @@ func New() *Application {
 	}
 	//init service layer
 	authService := service.New(db, rabbitmqProducer)
+
+	// init rabbitmq Consumer and inject userService to handle messages
+	rabbitConsumer, err := rabbitmq_consumer.NewRabbitMQConsumer(rabbitmqConn, "auth-service", authService)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//run consumer async
+	go func(rabbitConsumer *rabbitmq_consumer.RabbitMQConsumer) {
+		err := rabbitConsumer.Consume()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(rabbitConsumer)
 
 	tokenManager := jwtauth.New("HS256", []byte(config.JwtSecret), nil)
 
