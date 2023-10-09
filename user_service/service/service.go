@@ -5,20 +5,19 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"io"
-	"mime/multipart"
 	"time"
 
 	rabbitmq_producer "github.com/BernardN38/socialstream-backend/user_service/rabbitmq/producer"
 	rpc_client "github.com/BernardN38/socialstream-backend/user_service/rpc/client"
 	"github.com/BernardN38/socialstream-backend/user_service/sql/users"
-	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
+	"github.com/redis/go-redis/v9"
 )
 
 type UserService struct {
 	userDb           *sql.DB
 	userDbQuries     *users.Queries
+	redisClient      *redis.Client
 	minioClient      *minio.Client
 	rpcClient        *rpc_client.RpcClient
 	rabbitmqPorducer *rabbitmq_producer.RabbitMQProducer
@@ -28,7 +27,7 @@ type UserServiceConfig struct {
 	MinioBucketName string
 }
 
-func New(userDb *sql.DB, minioClient *minio.Client, rpcClient *rpc_client.RpcClient, rabbitmqProducer *rabbitmq_producer.RabbitMQProducer, config UserServiceConfig) (*UserService, error) {
+func New(userDb *sql.DB, redisClient *redis.Client, minioClient *minio.Client, rpcClient *rpc_client.RpcClient, rabbitmqProducer *rabbitmq_producer.RabbitMQProducer, config UserServiceConfig) (*UserService, error) {
 	userDbQueries := users.New(userDb)
 	err := setup(*minioClient, "user-service")
 	if err != nil {
@@ -37,6 +36,7 @@ func New(userDb *sql.DB, minioClient *minio.Client, rpcClient *rpc_client.RpcCli
 	return &UserService{
 		userDb:           userDb,
 		userDbQuries:     userDbQueries,
+		redisClient:      redisClient,
 		minioClient:      minioClient,
 		rpcClient:        rpcClient,
 		rabbitmqPorducer: rabbitmqProducer,
@@ -154,7 +154,7 @@ func (u *UserService) DeleteUser(ctx context.Context, userId int32) error {
 			errCh <- err
 			return
 		}
-		msgBytes, err := json.Marshal(rabbitmq_producer.UserDeletedMessage{
+		msgBytes, err := json.Marshal(rabbitmq_producer.UserDeletedMsg{
 			UserId: userId,
 		})
 		if err != nil {
@@ -176,80 +176,25 @@ func (u *UserService) DeleteUser(ctx context.Context, userId int32) error {
 		return timeoutCtx.Err()
 	}
 }
-func (u *UserService) UpdateUserProfileImage(ctx context.Context, userId int32, image multipart.File, imageHeader *multipart.FileHeader) error {
-	timeoutCtx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
-	defer cancel()
 
-	tx, err := u.userDb.BeginTx(timeoutCtx, &sql.TxOptions{})
+func (u *UserService) GetUserProfileImage(ctx context.Context, userId int32) (int32, error) {
+	mediaId, err := u.userDbQuries.GetUserProfileImageByUserId(ctx, userId)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	defer tx.Rollback()
-	txQuries := u.userDbQuries.WithTx(tx)
-	profileImageId, err := txQuries.GetUserProfileImageByUserId(ctx, userId)
-	if err != nil {
-		return err
-	}
+	return mediaId.Int32, nil
+}
 
-	if profileImageId.Valid {
-		err := u.rpcClient.DeleteMedia(profileImageId.UUID)
-		if err != nil {
-			return err
-		}
-	}
-	newImageId := uuid.New()
-	err = txQuries.UpdateUserProfileImage(timeoutCtx, users.UpdateUserProfileImageParams{
+func (u *UserService) UpdateUserProfileImageId(ctx context.Context, userId int32, mediaId int32) error {
+	err := u.userDbQuries.UpdateUserProfileImage(ctx, users.UpdateUserProfileImageParams{
 		UserID: userId,
-		ProfileImageID: uuid.NullUUID{
-			UUID:  newImageId,
-			Valid: true,
+		ProfileImageID: sql.NullInt32{
+			Int32: mediaId,
+			Valid: mediaId > 0,
 		},
 	})
 	if err != nil {
 		return err
 	}
-
-	successCh := make(chan bool)
-	errCh := make(chan error)
-
-	go func() {
-		imageBytes, err := io.ReadAll(image)
-		if err != nil {
-			errCh <- err
-			return
-		}
-		err = u.rpcClient.UploadMedia(&rpc_client.RpcImageUpload{
-			ImageData:   imageBytes,
-			MediaId:     newImageId,
-			ContentType: imageHeader.Header.Get("Content-Type"),
-		})
-		if err != nil {
-			errCh <- err
-			return
-		}
-		successCh <- true
-	}()
-
-	select {
-	case <-successCh:
-		err = tx.Commit()
-		if err != nil {
-			return err
-		}
-		return nil
-	case err := <-errCh:
-		tx.Rollback()
-		return err
-	case <-timeoutCtx.Done():
-		tx.Rollback()
-		return timeoutCtx.Err()
-	}
-}
-
-func (u *UserService) GetUserProfileImage(ctx context.Context, userId int32) (uuid.UUID, error) {
-	mediaId, err := u.userDbQuries.GetUserProfileImageByUserId(ctx, userId)
-	if err != nil {
-		return uuid.UUID{}, err
-	}
-	return mediaId.UUID, nil
+	return nil
 }

@@ -1,6 +1,7 @@
 package rpc_server
 
 import (
+	"bytes"
 	"context"
 	"net/rpc"
 
@@ -10,8 +11,9 @@ import (
 
 type ImageUpload struct {
 	ImageData   []byte
-	MediaId     uuid.UUID
+	UserId      int32
 	ContentType string
+	Size        int64
 }
 
 // Handler is the struct which exposes the User Server methods
@@ -31,18 +33,25 @@ func New(mediaService *service.MediaService) *RpcServer {
 	return s
 }
 
-func (s *RpcServer) UploadImage(payload ImageUpload, reply *error) error {
-	var resp error
-	resp = s.mediaService.UploadMedia(context.Background(), service.RpcImageUpload{
-		MediaData:   payload.ImageData,
-		MediaId:     payload.MediaId,
-		ContentType: payload.ContentType,
+func (s *RpcServer) UploadImage(payload ImageUpload, reply *int32) error {
+	reader := bytes.NewReader(payload.ImageData)
+	mediaId, err := s.mediaService.UploadMedia(context.Background(), service.ImageUpload{
+		MediaData:     reader,
+		UserId:        payload.UserId,
+		ContentType:   payload.ContentType,
+		ContentLength: payload.Size,
 	})
-	reply = &resp
+	if err != nil {
+		return err
+	}
+	*reply = *mediaId
 	return nil
 }
 func (s *RpcServer) DeleteImage(payload uuid.UUID, reply *error) error {
-	err := s.mediaService.DeleteMedia(context.Background(), payload)
+	err := s.mediaService.DeleteExternalId(context.Background(), payload)
+	if err != nil {
+		return err
+	}
 	reply = &err
 	return nil
 }

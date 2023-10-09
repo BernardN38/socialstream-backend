@@ -1,6 +1,8 @@
 AUTH_BINARY=authApp
 USER_BINARY=userApp
 MEDIA_BINARY=mediaApp
+POST_BINARY=postApp
+
 ## up: starts all containers in the background without forcing build
 up:
 	@echo "Starting Docker images..."
@@ -8,7 +10,7 @@ up:
 	@echo "Docker images started!"
 
 ## up_build: stops docker-compose (if running), builds all projects and starts docker compose
-up_build: build_auth build_user build_media build_image_proccessing_service
+up_build: build_auth build_user build_post build_media build_image_proccessing_service
 	@echo "Stopping docker images (if running...)"
 	docker-compose down 
 	@echo "Building (when required) and starting docker images..."
@@ -31,6 +33,12 @@ build_auth:
 build_user:
 	@echo "Building user binary..."
 	cd ../user_service && env GOOS=linux CGO_ENABLED=0 go build -o ${USER_BINARY} ./cmd/api
+	@echo "Done!"
+
+## build_post: builds the users binary as a linux executable
+build_post:
+	@echo "Building user binary..."
+	cd ../post_service && env GOOS=linux CGO_ENABLED=0 go build -o ${POST_BINARY} ./cmd/api
 	@echo "Done!"
 
 ## build_user: builds the media binary as a linux executable

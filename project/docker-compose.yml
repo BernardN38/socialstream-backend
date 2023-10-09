@@ -8,8 +8,8 @@ services:
       replicas: 1
       resources:
         limits:
-          cpus: "1"
-          memory: 1024M
+          cpus: "0.50"
+          memory: 512M
         reservations:
           cpus: "0.25"
           memory: 128M
@@ -22,9 +22,23 @@ services:
       - "8080:8080"
     depends_on:
       - authentication-service
-
+  redis:
+    image: redis:latest
+    container_name: my-redis
+    ports:
+      - "6379:6379"
   minio:
     image: minio/minio
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
     command: server --address ":9000" --console-address ":9001" /data
     ports:
       - "9001:9001"
@@ -41,8 +55,8 @@ services:
       replicas: 1
       resources:
         limits:
-          cpus: "1"
-          memory: 1024M
+          cpus: "0.50"
+          memory: 512M
         reservations:
           cpus: "0.25"
           memory: 128M
@@ -53,6 +67,7 @@ services:
       - APP_DB_USER=postgres
       - APP_DB_PASS=password
       - AUTH_DB_NAME=authentication_service
+      - POST_DB_NAME=post_service
       - USER_DB_NAME=user_service
       - MEDIA_DB_NAME=media_service
       - PGUSER=postgres
@@ -79,8 +94,8 @@ services:
       replicas: 1
       resources:
         limits:
-          cpus: "1"
-          memory: 1024M
+          cpus: "0.50"
+          memory: 512M
         reservations:
           cpus: "0.25"
           memory: 128M
@@ -106,8 +121,8 @@ services:
       replicas: 1
       resources:
         limits:
-          cpus: "1"
-          memory: 1024M
+          cpus: "0.50"
+          memory: 512M
         reservations:
           cpus: "0.25"
           memory: 128M
@@ -135,8 +150,8 @@ services:
       replicas: 1
       resources:
         limits:
-          cpus: "1"
-          memory: 1024M
+          cpus: "0.50"
+          memory: 512M
         reservations:
           cpus: "0.25"
           memory: 128M
@@ -158,6 +173,35 @@ services:
       timeout: 10s
       retries: 3
 
+  post-service:
+    build:
+      context: ../post_service
+      dockerfile: ./post_service.dockerfile
+    restart: always
+    deploy:
+      mode: replicated
+      replicas: 1
+      resources:
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M
+    environment:
+      postgresDsn: "user=postgres password=password host=postgres dbname=post_service port=5432 sslmode=disable"
+      jwtSecret: "qwertyuiopasdfghjklzxcvbnm123456"
+      port: ":8080"
+      rabbitmqUrl: "amqp://guest:guest@rabbitmq"
+    depends_on:
+      - postgres
+      - rabbitmq
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/posts/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   media-service:
     build:
       context: ../media_service
@@ -168,8 +212,8 @@ services:
       replicas: 1
       resources:
         limits:
-          cpus: "1"
-          memory: 1024M
+          cpus: "0.50"
+          memory: 512M
         reservations:
           cpus: "0.25"
           memory: 128M
@@ -191,7 +235,6 @@ services:
       timeout: 10s
       retries: 3
 
-
   image-proccessing-service:
     build:
       context: ../image_proccessing_service
@@ -201,9 +244,9 @@ services:
       mode: replicated
       replicas: 1
       resources:
-            limits:
-              cpus: "1"
-              memory: 4G
-            reservations:
-              cpus: "0.25"
-              memory: 128M
+        limits:
+          cpus: "0.50"
+          memory: 512M
+        reservations:
+          cpus: "0.25"
+          memory: 128M

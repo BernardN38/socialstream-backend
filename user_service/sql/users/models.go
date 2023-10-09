@@ -5,7 +5,7 @@
 package users
 
 import (
-	"github.com/google/uuid"
+	"database/sql"
 )
 
 type User struct {
@@ -14,5 +14,5 @@ type User struct {
 	Email          string        `json:"email"`
 	Firstname      string        `json:"firstname"`
 	Lastname       string        `json:"lastname"`
-	ProfileImageID uuid.NullUUID `json:"profileImageId"`
+	ProfileImageID sql.NullInt32 `json:"profileImageId"`
 }

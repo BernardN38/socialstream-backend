@@ -22,6 +22,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 	"github.com/pressly/goose/v3"
+	"github.com/redis/go-redis/v9"
 	"github.com/streadway/amqp"
 )
 
@@ -79,8 +80,14 @@ func New() *Application {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "redis:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
 	//init service layer
-	userService, err := service.New(db, minioClient, rpcClient, rabbitmqProducer, service.UserServiceConfig{MinioBucketName: config.MinioBucketName})
+	userService, err := service.New(db, rdb, minioClient, rpcClient, rabbitmqProducer, service.UserServiceConfig{MinioBucketName: config.MinioBucketName})
 	if err != nil {
 		log.Fatal(err)
 	}

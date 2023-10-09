@@ -5,5 +5,5 @@ CREATE TABLE users
     email      text NOT NULL UNIQUE,
     firstname text NOT NULL,
     lastname text NOT NULL,
-    profile_image_id uuid
+    profile_image_id int
 );

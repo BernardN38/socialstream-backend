@@ -1,12 +1,13 @@
 package service
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
 	"log"
+	"mime/multipart"
 	"time"
 
 	rabbitmq_producer "github.com/BernardN38/socialstream-backend/media_service/rabbitmq/producer"
@@ -24,10 +25,16 @@ type MediaService struct {
 	rabbitmqProducer *rabbitmq_producer.RabbitMQProducer
 	config           *MediaServiceConfig
 }
-type RpcImageUpload struct {
-	MediaData   []byte
-	MediaId     uuid.UUID
-	ContentType string
+type ImageUpload struct {
+	MediaData     io.Reader
+	UserId        int32
+	ContentType   string
+	ContentLength int64
+}
+type MediaUpdate struct {
+	MediaId       int32     `json:"mediaId"`
+	NewExternalId uuid.UUID `json:"newExternalId"`
+	OldExternalId uuid.UUID `json:"oldExternalId"`
 }
 type MediaServiceConfig struct {
 	MinioBucketName string
@@ -49,15 +56,21 @@ func New(minioClient *minio.Client, mediaDb *sql.DB, rpcClient *rpc_client.RpcCl
 		config:           &config,
 	}, nil
 }
-
-func (m *MediaService) GetImage(ctx context.Context, imageId uuid.UUID) (*minio.Object, error) {
+func (m *MediaService) GetAllMedia(ctx context.Context) ([]media_sql.Medium, error) {
+	media, err := m.mediaQueries.GetAllMedia(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return media, nil
+}
+func (m *MediaService) GetExternalId(ctx context.Context, externalId uuid.UUID) (*minio.Object, error) {
 	ctx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancel()
 
 	respCh := make(chan *minio.Object)
 	errCh := make(chan error)
 	go func() {
-		object, err := m.minioClient.GetObject(ctx, "media-service", imageId.String(), minio.GetObjectOptions{})
+		object, err := m.minioClient.GetObject(ctx, "media-service", externalId.String(), minio.GetObjectOptions{})
 		if err != nil {
 			errCh <- err
 		}
@@ -72,48 +85,84 @@ func (m *MediaService) GetImage(ctx context.Context, imageId uuid.UUID) (*minio.
 		return nil, ctx.Err()
 	}
 }
-func (m *MediaService) UploadMedia(ctx context.Context, payload RpcImageUpload) error {
-	ctx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
+func (m *MediaService) GetMediaCompressed(ctx context.Context, mediaId int32) (*minio.Object, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 200*time.Millisecond)
 	defer cancel()
 
-	tx, err := m.mediaDb.BeginTx(ctx, &sql.TxOptions{})
+	respCh := make(chan *minio.Object)
+	errCh := make(chan error)
+
+	go func() {
+		externalId, err := m.mediaQueries.GetCompressedExternalId(timeoutCtx, mediaId)
+		object, err := m.minioClient.GetObject(ctx, "media-service", externalId.String(), minio.GetObjectOptions{})
+		if err != nil {
+			errCh <- err
+		}
+		respCh <- object
+	}()
+	select {
+	case object := <-respCh:
+		return object, nil
+	case err := <-errCh:
+		return nil, err
+	case <-timeoutCtx.Done():
+		return nil, timeoutCtx.Err()
+	}
+}
+func (m *MediaService) UploadMedia(ctx context.Context, payload ImageUpload) (*int32, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
+	defer cancel()
+
+	tx, err := m.mediaDb.BeginTx(timeoutCtx, &sql.TxOptions{})
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer tx.Rollback()
 
 	txQuries := m.mediaQueries.WithTx(tx)
-	_, err = txQuries.CreateMedia(ctx, media_sql.CreateMediaParams{
-		MediaID: payload.MediaId,
-		OwnerID: 1,
+	newExternalIdFull := uuid.New()
+	newExternalIdCompressed := uuid.New()
+	mediaId, err := txQuries.CreateMedia(ctx, media_sql.CreateMediaParams{
+		ExternalUuidFull:       newExternalIdFull,
+		ExternalUuidCompressed: newExternalIdCompressed,
+		UserID:                 payload.UserId,
+		CompressionStatus:      "started",
+		IsActive:               true,
 	})
-	if err != nil {
-		return err
-	}
-
 	infoCh := make(chan minio.UploadInfo)
 	errCh := make(chan error)
 
 	go func() {
-		info, err := m.minioClient.PutObject(ctx, m.config.MinioBucketName, payload.MediaId.String(), bytes.NewReader(payload.MediaData), int64(len(payload.MediaData)), minio.PutObjectOptions{
+		info, err := m.minioClient.PutObject(timeoutCtx, m.config.MinioBucketName, newExternalIdFull.String(), payload.MediaData, payload.ContentLength, minio.PutObjectOptions{
 			ContentType: payload.ContentType,
 		})
 		if err != nil {
 			errCh <- err
 			return
 		}
-		msg, err := json.Marshal(struct {
-			MediaId     string `json:"mediaId"`
-			ContentType string `json:"contentType"`
+
+		msg := struct {
+			MediaId              int32     `json:"mediaId"`
+			ExternalIdFull       uuid.UUID `json:"externalIdFull"`
+			ExternalIdCompressed uuid.UUID `json:"externalIdCompressed"`
+			ContentType          string    `json:"contentType"`
 		}{
-			MediaId:     payload.MediaId.String(),
-			ContentType: payload.ContentType,
-		})
+			MediaId:              mediaId,
+			ExternalIdFull:       newExternalIdFull,
+			ExternalIdCompressed: newExternalIdCompressed,
+			ContentType:          payload.ContentType,
+		}
+		msgBytes, err := json.Marshal(msg)
 		if err != nil {
-			errCh <- errors.New("error publishing message")
+			errCh <- err
 			return
 		}
-		m.rabbitmqProducer.Publish("media.uploaded", msg)
+		log.Println("media uploaded publishing message:", msg)
+		err = m.rabbitmqProducer.Publish("media_events", "media.uploaded", msgBytes)
+		if err != nil {
+			errCh <- err
+			return
+		}
 		infoCh <- info
 	}()
 
@@ -121,43 +170,273 @@ func (m *MediaService) UploadMedia(ctx context.Context, payload RpcImageUpload) 
 	case info := <-infoCh:
 		err = tx.Commit()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		log.Println(info)
-		return nil
+		return &mediaId, nil
 	case err := <-errCh:
 		tx.Rollback()
-		return err
-	case <-ctx.Done():
+		return nil, err
+	case <-timeoutCtx.Done():
 		tx.Rollback()
-		return ctx.Err()
+		return nil, timeoutCtx.Err()
 	}
 }
-
-func (m *MediaService) DeleteMedia(ctx context.Context, mediaId uuid.UUID) error {
-	ctx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
+func (m *MediaService) DeleteMedia(ctx context.Context, mediaId int32) error {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 5000*time.Millisecond)
 	defer cancel()
-	tx, err := m.mediaDb.BeginTx(ctx, &sql.TxOptions{})
+
+	tx, err := m.mediaDb.BeginTx(timeoutCtx, &sql.TxOptions{})
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
 	txQuries := m.mediaQueries.WithTx(tx)
-	err = txQuries.DeleteMedia(ctx, mediaId)
-	if err != nil {
+
+	errCh := make(chan error)
+	successCh := make(chan bool)
+	go func() {
+		log.Println(mediaId)
+		compressionStatus, err := txQuries.GetCompressionStatusById(timeoutCtx, mediaId)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		if compressionStatus == "complete" {
+			externalIds, err := txQuries.GetExternalIdsById(timeoutCtx, mediaId)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			log.Println("removing exiternal id:", externalIds.ExternalUuidFull.String())
+			err = m.minioClient.RemoveObject(timeoutCtx, "media-service", externalIds.ExternalUuidFull.String(), minio.RemoveObjectOptions{})
+			if err != nil {
+				errCh <- err
+				return
+			}
+			log.Println("removing exiternal id:", externalIds.ExternalUuidCompressed.String())
+			err = m.minioClient.RemoveObject(timeoutCtx, "media-service", externalIds.ExternalUuidCompressed.String(), minio.RemoveObjectOptions{})
+			if err != nil {
+				errCh <- err
+				return
+			}
+			err = txQuries.DeleteMediaById(timeoutCtx, mediaId)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			successCh <- true
+		} else {
+			time.Sleep(time.Second * 1)
+			errCh <- errors.New("compression not done")
+		}
+	}()
+
+	select {
+	case <-successCh:
+		err = tx.Commit()
+		if err != nil {
+			return err
+		}
+		return nil
+	case err := <-errCh:
+		tx.Rollback()
 		return err
+	case <-timeoutCtx.Done():
+		tx.Rollback()
+		return timeoutCtx.Err()
 	}
+}
+func (m *MediaService) DeleteExternalId(ctx context.Context, externalId uuid.UUID) error {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1000*time.Millisecond)
+	defer cancel()
 
 	successCh := make(chan bool)
 	errCh := make(chan error)
 
 	go func() {
-		err := m.minioClient.RemoveObject(ctx, m.config.MinioBucketName, mediaId.String(), minio.RemoveObjectOptions{})
+		_, err := m.minioClient.StatObject(timeoutCtx, m.config.MinioBucketName, externalId.String(), minio.GetObjectOptions{})
+		if err != nil {
+			time.Sleep(time.Millisecond * 500)
+			errCh <- err
+			return
+		}
+		err = m.minioClient.RemoveObject(timeoutCtx, m.config.MinioBucketName, externalId.String(), minio.RemoveObjectOptions{})
 		if err != nil {
 			errCh <- err
 			return
 		}
+		successCh <- true
+	}()
+
+	select {
+	case <-successCh:
+		return nil
+	case err := <-errCh:
+		log.Println(err)
+		return err
+	case <-timeoutCtx.Done():
+		return timeoutCtx.Err()
+	}
+}
+
+func (m *MediaService) GetUserProfileImage(ctx context.Context, userId int32) (*minio.Object, error) {
+	timeoutCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	respCh := make(chan *minio.Object)
+	errCh := make(chan error)
+	mediaId, err := m.rpcClient.GetUserProfileImageIdRpc(userId)
+	if err != nil {
+		return nil, err
+	}
+	externalIds, err := m.mediaQueries.GetExternalIdsById(ctx, mediaId)
+	if err != nil {
+		return nil, err
+	}
+	var retrieveId uuid.UUID
+	if externalIds.CompressionStatus == "complete" {
+		retrieveId = externalIds.ExternalUuidCompressed
+	} else {
+		retrieveId = externalIds.ExternalUuidFull
+	}
+	go func(context.Context) {
+		log.Println("getting mediaId: ", mediaId)
+		object, err := m.minioClient.GetObject(ctx, "media-service", retrieveId.String(), minio.GetObjectOptions{})
+		if err != nil {
+			log.Println(err)
+			errCh <- err
+			return
+		}
+		respCh <- object
+	}(ctx)
+	select {
+	case object := <-respCh:
+		return object, nil
+	case err := <-errCh:
+		return nil, err
+	case <-timeoutCtx.Done():
+		return nil, timeoutCtx.Err()
+	}
+}
+
+func (m *MediaService) UploadUserProfileImage(ctx context.Context, userId int32, image multipart.File, imageHeader *multipart.FileHeader) error {
+
+	timeoutCtx, cancel := context.WithTimeout(ctx, 1500*time.Millisecond)
+	defer cancel()
+
+	tx, err := m.mediaDb.BeginTx(timeoutCtx, &sql.TxOptions{
+		Isolation: sql.LevelSerializable,
+	})
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	txQuries := m.mediaQueries.WithTx(tx)
+
+	successCh := make(chan bool)
+	errCh := make(chan error)
+
+	go func() {
+		externalIdFull := uuid.New()
+		externalIdCompressed := uuid.New()
+		previousMediaId, err := m.rpcClient.GetUserProfileImageIdRpc(userId)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		var mediaId int32
+		//check if user has a previous profile media
+		if previousMediaId > 0 {
+			mediaId = previousMediaId
+			externalIds, err := txQuries.GetExternalIdsById(timeoutCtx, previousMediaId)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			msg := rabbitmq_producer.ExternalIdDeletedMsg{
+				ExternalId: externalIds.ExternalUuidFull,
+			}
+			msgBytes, err := json.Marshal(msg)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			err = m.rabbitmqProducer.Publish("media_events", "media.externalId.deleted", msgBytes)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			msg2 := rabbitmq_producer.ExternalIdDeletedMsg{
+				ExternalId: externalIds.ExternalUuidCompressed,
+			}
+			msgBytes2, err := json.Marshal(msg2)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			err = m.rabbitmqProducer.Publish("media_events", "media.externalId.deleted", msgBytes2)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			err = txQuries.UpdateExternalIdsById(timeoutCtx, media_sql.UpdateExternalIdsByIdParams{
+				MediaID:                previousMediaId,
+				ExternalUuidFull:       externalIdFull,
+				ExternalUuidCompressed: externalIdCompressed,
+			})
+			if err != nil {
+				errCh <- err
+				return
+			}
+		} else {
+			newId, err := txQuries.CreateMedia(timeoutCtx, media_sql.CreateMediaParams{
+				ExternalUuidFull:       externalIdFull,
+				ExternalUuidCompressed: externalIdCompressed,
+				UserID:                 userId,
+				CompressionStatus:      "started",
+				IsActive:               true,
+			})
+			if err != nil {
+				errCh <- err
+				return
+			}
+			err = m.rpcClient.UpdateUserProfileImage(rpc_client.ProfileImageUpdateInput{
+				UserId:  userId,
+				MediaId: newId,
+			})
+			if err != nil {
+				errCh <- err
+				return
+			}
+			mediaId = newId
+		}
+
+		// upload image to minio
+		_, err = m.minioClient.PutObject(timeoutCtx, m.config.MinioBucketName, externalIdFull.String(), image, imageHeader.Size, minio.PutObjectOptions{
+			ContentType: imageHeader.Header.Get("Content-Type"),
+		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		msg := rabbitmq_producer.MediaUploadedMsg{
+			MediaId:              mediaId,
+			ExternalIdFull:       externalIdFull,
+			ExternalIdCompressed: externalIdCompressed,
+			ContentType:          imageHeader.Header.Get("Content-Type"),
+		}
+		msgBytes, err := json.Marshal(msg)
+		if err != nil {
+			errCh <- err
+			return
+		}
+		err = m.rabbitmqProducer.Publish("media_events", "media.uploaded", msgBytes)
+		if err != nil {
+			errCh <- err
+			return
+		}
+
 		successCh <- true
 	}()
 
@@ -170,75 +449,20 @@ func (m *MediaService) DeleteMedia(ctx context.Context, mediaId uuid.UUID) error
 		return nil
 	case err := <-errCh:
 		tx.Rollback()
-		log.Println(err)
 		return err
-	case <-ctx.Done():
+	case <-timeoutCtx.Done():
 		tx.Rollback()
-		return ctx.Err()
+		return timeoutCtx.Err()
 	}
 }
 
-func (m *MediaService) GetUserProfileImage(reqCtx context.Context, userId int32) (*minio.Object, error) {
-	ctx, cancel := context.WithTimeout(reqCtx, 500*time.Millisecond)
-	defer cancel()
-	respCh := make(chan *minio.Object)
-	errCh := make(chan error)
-	mediaId, err := m.rpcClient.GetUserProfileImageIdRpc(userId)
+func (m *MediaService) UpdateCompressionStatus(ctx context.Context, mediaId int32, status string) error {
+	err := m.mediaQueries.UpdateCompressionStatus(ctx, media_sql.UpdateCompressionStatusParams{
+		MediaID:           mediaId,
+		CompressionStatus: status,
+	})
 	if err != nil {
-		cancel()
-		return nil, err
+		return err
 	}
-	go func(context.Context) {
-		object, err := m.minioClient.GetObject(reqCtx, "media-service", mediaId.String(), minio.GetObjectOptions{})
-		if err != nil {
-			errCh <- err
-			return
-		}
-		respCh <- object
-	}(ctx)
-	select {
-	case object := <-respCh:
-		return object, nil
-	case err := <-errCh:
-		return nil, err
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	}
+	return nil
 }
-
-// testing compression
-// func compressAndLogSizes(inputData []byte, quality int) (*bytes.Buffer, error) {
-// 	startTime := time.Now().UnixMilli()
-// 	// Create an image.Image from the byte slice
-// 	img, _, err := image.Decode(bytes.NewReader(inputData))
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	// Compress the image
-// 	var compressedBufferBefore bytes.Buffer
-// 	err = jpeg.Encode(&compressedBufferBefore, img, nil)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	// Get the size before compression
-// 	sizeBefore := len(compressedBufferBefore.Bytes())
-
-// 	// Set the compression options
-// 	var opt jpeg.Options
-// 	opt.Quality = quality
-
-// 	// Compress the image with specified quality
-// 	var compressedBufferAfter bytes.Buffer
-// 	err = jpeg.Encode(&compressedBufferAfter, img, &opt)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	// Get the size after compression
-// 	sizeAfter := len(compressedBufferAfter.Bytes())
-// 	endTime := time.Now().UnixMilli()
-// 	fmt.Println("runtime: ", endTime-startTime, "size before: ", sizeBefore, "size after: ", sizeAfter)
-// 	return &compressedBufferAfter, nil
-// }
