@@ -115,3 +115,8 @@ func (c *RabbitMQConsumer) Consume() error {
 	<-forever
 	return nil
 }
+
+type UserProfileImageUploadInput struct {
+	UserId  int32 `json:"userId"`
+	MediaId int32 `json:"mediaId"`
+}

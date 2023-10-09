@@ -1,6 +1,8 @@
 package rabbitmq_producer
 
 import (
+	"time"
+
 	"github.com/streadway/amqp"
 )
 
@@ -16,30 +18,31 @@ type RabbitMQProducer struct {
 	exchange string
 }
 
-func NewRabbitMQProducer(conn *amqp.Connection, exchangeName string) (*RabbitMQProducer, error) {
+func NewRabbitMQProducer(conn *amqp.Connection, exchangeNames ...string) (*RabbitMQProducer, error) {
 	channel, err := conn.Channel()
 	if err != nil {
 		conn.Close()
 		return nil, err
 	}
-	err = channel.ExchangeDeclare(
-		exchangeName,
-		"topic",
-		true,
-		false,
-		false,
-		false,
-		nil,
-	)
-	if err != nil {
-		conn.Close()
-		return nil, err
+	for _, v := range exchangeNames {
+		err = channel.ExchangeDeclare(
+			v,
+			"topic",
+			true,
+			false,
+			false,
+			false,
+			nil,
+		)
+		if err != nil {
+			conn.Close()
+			return nil, err
+		}
 	}
 
 	return &RabbitMQProducer{
-		conn:     conn,
-		channel:  channel,
-		exchange: exchangeName,
+		conn:    conn,
+		channel: channel,
 	}, nil
 }
 
@@ -59,15 +62,16 @@ func (p *RabbitMQProducer) Close() error {
 }
 
 // Publish sends a message to the RabbitMQ exchange with the given routing key.
-func (p *RabbitMQProducer) Publish(topic string, message []byte) error {
+func (p *RabbitMQProducer) Publish(exchange string, topic string, message []byte) error {
 	err := p.channel.Publish(
-		p.exchange, // exchange: the name of the topic exchange
-		topic,      // routing key: the topic or event type, e.g., "create.user" or "update.user"
-		false,      // mandatory: false means the message can be silently dropped if no queue is bound to the exchange
-		false,      // immediate: false means the message can be queued if it can't be delivered immediately
+		exchange, // exchange: the name of the topic exchange
+		topic,    // routing key: the topic or event type, e.g., "create.user" or "update.user"
+		false,    // mandatory: false means the message can be silently dropped if no queue is bound to the exchange
+		false,    // immediate: false means the message can be queued if it can't be delivered immediately
 		amqp.Publishing{
-			ContentType: "text/plain",
+			ContentType: "application/json",
 			Body:        message,
+			Timestamp:   time.Now(),
 		},
 	)
 

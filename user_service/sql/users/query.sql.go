@@ -7,8 +7,7 @@ package users
 
 import (
 	"context"
-
-	"github.com/google/uuid"
+	"database/sql"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -101,9 +100,9 @@ FROM users
 WHERE user_id = $1 LIMIT 1
 `
 
-func (q *Queries) GetUserProfileImageByUserId(ctx context.Context, userID int32) (uuid.NullUUID, error) {
+func (q *Queries) GetUserProfileImageByUserId(ctx context.Context, userID int32) (sql.NullInt32, error) {
 	row := q.db.QueryRowContext(ctx, getUserProfileImageByUserId, userID)
-	var profile_image_id uuid.NullUUID
+	var profile_image_id sql.NullInt32
 	err := row.Scan(&profile_image_id)
 	return profile_image_id, err
 }
@@ -175,7 +174,7 @@ UPDATE users SET profile_image_id = $2 WHERE user_id = $1
 
 type UpdateUserProfileImageParams struct {
 	UserID         int32         `json:"userId"`
-	ProfileImageID uuid.NullUUID `json:"profileImageId"`
+	ProfileImageID sql.NullInt32 `json:"profileImageId"`
 }
 
 func (q *Queries) UpdateUserProfileImage(ctx context.Context, arg UpdateUserProfileImageParams) error {

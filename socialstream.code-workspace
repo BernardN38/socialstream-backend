@@ -14,6 +14,9 @@
     },
     {
       "path": "image_proccessing_service"
+    },
+    {
+      "path": "post_service"
     }
   ],
   "settings": {}

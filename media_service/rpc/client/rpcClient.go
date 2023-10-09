@@ -22,11 +22,28 @@ func New(userServiceClient *rpc.Client) (*RpcClient, error) {
 	}, nil
 }
 
-func (rc *RpcClient) GetUserProfileImageIdRpc(userId int32) (uuid.UUID, error) {
-	var reply uuid.UUID
+func (rc *RpcClient) GetUserProfileImageIdRpc(userId int32) (int32, error) {
+	var reply int32
 	err := rc.userServiceRpcClient.Call("RpcServer.GetUserProfileImageId", userId, &reply)
 	if err != nil {
-		return uuid.UUID{}, err
+		return 0, err
 	}
 	return reply, nil
+}
+
+type ProfileImageUpdateInput struct {
+	UserId  int32
+	MediaId int32
+}
+
+func (rc *RpcClient) UpdateUserProfileImage(imageUpdate ProfileImageUpdateInput) error {
+	var reply error
+	err := rc.userServiceRpcClient.Call("RpcServer.UpdateUserProfileImageId", imageUpdate, &reply)
+	if err != nil {
+		return err
+	}
+	if reply != nil {
+		return reply
+	}
+	return nil
 }

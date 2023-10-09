@@ -1,0 +1,194 @@
+package application
+
+import (
+	"database/sql"
+	"embed"
+	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"net/rpc"
+	"time"
+
+	"github.com/BernardN38/socialstream-backend/post_service/handler"
+	rabbitmq_consumer "github.com/BernardN38/socialstream-backend/post_service/rabbitmq/consumer"
+	rabbitmq_producer "github.com/BernardN38/socialstream-backend/post_service/rabbitmq/producer"
+	rpc_client "github.com/BernardN38/socialstream-backend/post_service/rpc/client"
+	rpc_server "github.com/BernardN38/socialstream-backend/post_service/rpc/server"
+	"github.com/BernardN38/socialstream-backend/post_service/service"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/jwtauth/v5"
+	_ "github.com/lib/pq"
+
+	"github.com/pressly/goose/v3"
+	"github.com/redis/go-redis/v9"
+	"github.com/streadway/amqp"
+)
+
+type Application struct {
+	server *server
+}
+type server struct {
+	router *chi.Mux
+	port   string
+}
+
+//go:embed migrations/*.sql
+var embedMigrations embed.FS
+
+func New() *Application {
+	//get env configuration
+	config, err := getEnvConfig()
+	if err != nil {
+		log.Fatal(err)
+	}
+	// start the rpc server
+	l, err := net.Listen("tcp", ":8081")
+	if err != nil {
+		log.Fatal(err)
+	}
+	//connect to postgres db
+	db, err := sql.Open("postgres", config.PostgresDsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//run db migrations
+	err = RunDatabaseMigrations(db)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	//init rabbitmq connection
+	rabbitmqConn, err := ConnectRabbitMQWithRetry(config.RabbitUrl, 5, time.Second*10)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	medaiServiceRpcClient, err := ConnectToRpcServer("media-service:8081", 5, 10*time.Second)
+	if err != nil {
+		log.Fatal(err)
+	}
+	rpcClient, err := rpc_client.New(medaiServiceRpcClient)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	rabbitmqProducer, err := rabbitmq_producer.NewRabbitMQProducer(rabbitmqConn, "post_events")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr:     "redis:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	//init service layer
+	postService, err := service.New(db, rdb, rpcClient, rabbitmqProducer, service.PostServiceConfig{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// init rabbitmq Consumer and inject userService to handle messages
+	rabbitConsumer, err := rabbitmq_consumer.NewRabbitMQConsumer(rabbitmqConn, "post-service", postService)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//run consumer async
+	go func(rabbitConsumer *rabbitmq_consumer.RabbitMQConsumer) {
+		err := rabbitConsumer.Consume()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}(rabbitConsumer)
+
+	go func() {
+		rpc_server.NewRpcServer(postService)
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				log.Println(err)
+				continue
+			}
+			go rpc.ServeConn(conn)
+		}
+	}()
+	// init jwt token manager with env secret key
+	tokenManager := jwtauth.New("HS256", []byte(config.JwtSecret), nil)
+
+	//init handler, inject service
+	handler := handler.NewHandler(postService)
+
+	//init server, inject handler & confid
+	server := NewServer(handler, tokenManager, config)
+
+	return &Application{
+		server: server,
+	}
+}
+
+func (a *Application) Run() {
+	//start server
+	log.Printf("listening on port %s", a.server.port)
+	log.Fatal(http.ListenAndServe(a.server.port, a.server.router))
+}
+
+func NewServer(handler *handler.Handler, tm *jwtauth.JWTAuth, config *config) *server {
+	r := SetupRouter(handler, tm)
+	return &server{
+		router: r,
+		port:   config.Port,
+	}
+}
+
+func RunDatabaseMigrations(db *sql.DB) error {
+	goose.SetBaseFS(embedMigrations)
+	if err := goose.SetDialect("postgres"); err != nil {
+		return err
+	}
+	if err := goose.Up(db, "migrations"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// ConnectWithRetry establishes a connection to RabbitMQ with wait and retry logic.
+func ConnectRabbitMQWithRetry(amqpURL string, maxRetries int, retryInterval time.Duration) (*amqp.Connection, error) {
+	var conn *amqp.Connection
+	var err error
+
+	for retries := 0; retries <= maxRetries; retries++ {
+		conn, err = amqp.Dial(amqpURL)
+		if err == nil {
+			log.Println("Connected to RabbitMQ successfully.")
+			return conn, nil
+		}
+
+		log.Printf("Failed to connect to RabbitMQ: %v", err)
+		if retries < maxRetries {
+			log.Printf("Retrying connection in %v...", retryInterval)
+			time.Sleep(retryInterval)
+		}
+	}
+
+	return nil, fmt.Errorf("failed to connect to RabbitMQ after %d retries", maxRetries)
+}
+
+func ConnectToRpcServer(address string, retries int, retryInterval time.Duration) (*rpc.Client, error) {
+	var userServiceRpcClient *rpc.Client
+	var err error
+
+	for i := 0; i < retries; i++ {
+		userServiceRpcClient, err = rpc.Dial("tcp", address)
+		if err == nil {
+			return userServiceRpcClient, nil
+		}
+
+		log.Printf("Error connecting to user service. Retrying in %s...\n", retryInterval)
+		time.Sleep(retryInterval)
+	}
+
+	return nil, err
+}

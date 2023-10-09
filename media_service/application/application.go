@@ -75,7 +75,7 @@ func New() *Application {
 		log.Fatal(err)
 	}
 
-	rabbitmqProducer, err := rabbitmq_producer.NewRabbitMQProducer(rabbitmqConn, "media_events")
+	rabbitmqProducer, err := rabbitmq_producer.NewRabbitMQProducer(rabbitmqConn, "media_events", "user_events")
 	if err != nil {
 		log.Fatal(err)
 	}

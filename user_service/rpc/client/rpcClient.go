@@ -11,9 +11,11 @@ type RpcClient struct {
 }
 
 type RpcImageUpload struct {
-	ImageData   []byte
-	MediaId     uuid.UUID
-	ContentType string
+	ImageData    []byte
+	MediaId      uuid.UUID
+	UserId       int32
+	ContentType  string
+	ProfileImage bool
 }
 
 func New(mediaServiceClient *rpc.Client) (*RpcClient, error) {
@@ -22,16 +24,13 @@ func New(mediaServiceClient *rpc.Client) (*RpcClient, error) {
 	}, nil
 }
 
-func (rc *RpcClient) UploadMedia(ImageUpload *RpcImageUpload) error {
-	var replyErr error
-	err := rc.mediaServiceRpcClient.Call("RpcServer.UploadImage", ImageUpload, &replyErr)
+func (rc *RpcClient) UploadMedia(ImageUpload *RpcImageUpload) (int32, error) {
+	var mediaId int32
+	err := rc.mediaServiceRpcClient.Call("RpcServer.UploadImage", ImageUpload, &mediaId)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	if replyErr != nil {
-		return replyErr
-	}
-	return nil
+	return mediaId, nil
 }
 
 func (rc *RpcClient) DeleteMedia(mediaId uuid.UUID) error {
