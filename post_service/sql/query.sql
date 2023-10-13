@@ -1,8 +1,8 @@
 -- name: GetAll :many
 SELECT * FROM posts;
 
--- name: GetPost :one
-SELECT user_id FROM posts WHERE id = $1;
+-- name: GetPostUserAndMediaId :one
+SELECT user_id, media_id FROM posts WHERE id = $1;
 
 -- name: DeletePost :exec
 DELETE FROM posts WHERE id = $1 AND user_id = $2;

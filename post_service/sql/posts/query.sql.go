@@ -79,17 +79,6 @@ func (q *Queries) GetAll(ctx context.Context) ([]Post, error) {
 	return items, nil
 }
 
-const getPost = `-- name: GetPost :one
-SELECT user_id FROM posts WHERE id = $1
-`
-
-func (q *Queries) GetPost(ctx context.Context, id int32) (int32, error) {
-	row := q.db.QueryRowContext(ctx, getPost, id)
-	var user_id int32
-	err := row.Scan(&user_id)
-	return user_id, err
-}
-
 const getPostPage = `-- name: GetPostPage :many
 SELECT id, user_id, username, body, media_id, created_at FROM posts WHERE user_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3
 `
@@ -128,4 +117,20 @@ func (q *Queries) GetPostPage(ctx context.Context, arg GetPostPageParams) ([]Pos
 		return nil, err
 	}
 	return items, nil
+}
+
+const getPostUserAndMediaId = `-- name: GetPostUserAndMediaId :one
+SELECT user_id, media_id FROM posts WHERE id = $1
+`
+
+type GetPostUserAndMediaIdRow struct {
+	UserID  int32         `json:"userId"`
+	MediaID sql.NullInt32 `json:"mediaId"`
+}
+
+func (q *Queries) GetPostUserAndMediaId(ctx context.Context, id int32) (GetPostUserAndMediaIdRow, error) {
+	row := q.db.QueryRowContext(ctx, getPostUserAndMediaId, id)
+	var i GetPostUserAndMediaIdRow
+	err := row.Scan(&i.UserID, &i.MediaID)
+	return i, err
 }
