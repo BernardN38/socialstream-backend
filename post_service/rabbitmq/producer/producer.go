@@ -59,12 +59,12 @@ func (p *RabbitMQProducer) Close() error {
 }
 
 // Publish sends a message to the RabbitMQ exchange with the given routing key.
-func (p *RabbitMQProducer) Publish(topic string, message []byte) error {
+func (p *RabbitMQProducer) Publish(exchange string, topic string, message []byte) error {
 	err := p.channel.Publish(
-		p.exchange, // exchange: the name of the topic exchange
-		topic,      // routing key: the topic or event type, e.g., "create.user" or "update.user"
-		false,      // mandatory: false means the message can be silently dropped if no queue is bound to the exchange
-		false,      // immediate: false means the message can be queued if it can't be delivered immediately
+		exchange, // exchange: the name of the topic exchange
+		topic,    // routing key: the topic or event type, e.g., "create.user" or "update.user"
+		false,    // mandatory: false means the message can be silently dropped if no queue is bound to the exchange
+		false,    // immediate: false means the message can be queued if it can't be delivered immediately
 		amqp.Publishing{
 			ContentType: "application/json",
 			Body:        message,

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -61,6 +62,11 @@ func (p *PostService) GetAllPosts(ctx context.Context) ([]posts.Post, error) {
 		return nil, timeoutCtx.Err()
 	}
 }
+
+type MediaDeletedMsg struct {
+	MediaId int32 `json:"mediaId"`
+}
+
 func (p *PostService) DeletePost(ctx context.Context, postId int32, userId int32) error {
 	timeoutCtx, cancel := context.WithTimeout(ctx, 300*time.Millisecond)
 	defer cancel()
@@ -68,12 +74,12 @@ func (p *PostService) DeletePost(ctx context.Context, postId int32, userId int32
 	successCh := make(chan bool)
 	errCh := make(chan error)
 	go func() {
-		postOwnerId, err := p.postQuries.GetPost(timeoutCtx, postId)
+		post, err := p.postQuries.GetPostUserAndMediaId(timeoutCtx, postId)
 		if err != nil {
 			errCh <- err
 			return
 		}
-		if userId != postOwnerId {
+		if userId != post.UserID {
 			errCh <- errors.New("unathorized")
 			return
 		}
@@ -81,6 +87,18 @@ func (p *PostService) DeletePost(ctx context.Context, postId int32, userId int32
 			ID:     postId,
 			UserID: userId,
 		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		msg, err := json.Marshal(MediaDeletedMsg{
+			MediaId: post.MediaID.Int32,
+		})
+		if err != nil {
+			errCh <- err
+			return
+		}
+		err = p.rabbitmProducer.Publish("media_events", "media.deleted", msg)
 		if err != nil {
 			errCh <- err
 			return
